@@ -1,0 +1,62 @@
+{
+  "layer": "app",
+  "annotators": [
+    {
+      "kind": "tpm"
+    },
+    {
+      "kind": "tls"
+    },
+    {
+      "kind": "pki"
+    },
+    {
+      "kind": "pki-http"
+    },
+    {
+      "kind": "source-code"
+    },
+    {
+      "kind": "checksum"
+    },
+    {
+      "kind": "src"
+    },
+    {
+      "kind": "sbom",
+      "type": "SPDX",
+      "version": "2.2.4"
+    }
+  ],
+  "hash": {
+    "type": "sha256"
+  },
+  "signature": {
+    "public": {
+      "type": "ed25519",
+      "path": "./res/public.key"
+    },
+    "private": {
+      "type": "ed25519",
+      "path": "./res/private.key"
+    }
+  },
+  "stream": {
+    "type": "mqtt",
+    "config": {
+      "clientId": "alvarium-transit",
+      "qos": 0,
+      "user": "mosquitto",
+      "password": "",
+      "provider": {
+        "host": "mosquitto-server",
+        "protocol": "tcp",
+        "port": 1883
+      },
+      "cleanness": false,
+      "topics": [
+        "alvarium-topic"
+      ]
+    }
+  }
+}
