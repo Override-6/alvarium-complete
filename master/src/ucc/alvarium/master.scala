@@ -3,24 +3,22 @@ package ucc.alvarium
 import com.alvarium.annotators.{AnnotatorFactory, ChecksumAnnotatorProps, SourceCodeAnnotatorProps}
 import com.alvarium.contracts.AnnotationType
 import com.alvarium.{DefaultSdk, Sdk, SdkInfo}
-import org.apache.logging.log4j.{Level, LogManager}
-import org.apache.logging.log4j.core.config.Configurator
+import org.apache.logging.log4j.LogManager
 import ucc.alvarium.PropertyBag as PBag
-
-import javax.net.ssl.SSLSocketFactory
 import zio.*
-import zio.http.{URL, *}
-import zio.stream.{ZSink, ZStream}
+import zio.http.*
+import zio.stream.ZStream
 
 case class ImageInfo(id: String, gender: String, masterCategory: String, subCategory: String, articleType: String, baseColour: String, season: String, year: Int, usage: String, productDisplayName: String)
 
 val tcount = java.lang.Runtime.getRuntime.availableProcessors()
 
-val images = os.pwd / "data" / "images"
+val images = (os.pwd / "data" / "images")
 
+val Address = "alvarium-workers"
 
 object master extends ZIOAppDefault {
-  def run: RIO[ZIOAppArgs, Unit] = {
+  def run  = {
     val sdkLayer = ZLayer.succeed {
       val log = LogManager.getRootLogger
       val config = os.read(os.pwd / "config" / "config.json")
@@ -40,17 +38,10 @@ object master extends ZIOAppDefault {
       ),
     ))
 
-    os.walk(os.pwd).foreach(println)
-    println("data : ")
-    os.walk(os.pwd / "data").foreach(println)
-
     val lines = os.read.lines(os.pwd / "data" / "styles.csv")
-
-
 
     val stream = for {
       args <- ZStream.service[ZIOAppArgs]
-      address = args.getArgs.head
       response <- ZStream.fromIterable(lines)
         .mapZIOParUnordered(tcount)(s => ZIO.succeed(s.split(',')))
         .mapZIOParUnordered(tcount) {
@@ -60,17 +51,20 @@ object master extends ZIOAppDefault {
         .mapZIOParUnordered(tcount) { info =>
           for {
             sdk <- ZIO.service[Sdk]
+            _ <- Console.printLine("sdk retrieved")
             body <- Body.fromFile((images / s"${info.id}.jpg").toIO)
+            _ <- Console.printLine("Body got")
             response <- ZClient.request(Request(
               method = Method.GET,
-              url = URL(Path(s"http://$address:8080/compute")),
+              url = URL(Path(s"http://$Address:8080/compute")),
               body = body
             ))
+            _ <- Console.printLine("Request sent")
           } yield response
         }
     } yield ()
 
-    stream.runDrain
+    Console.printLine("Running") &> stream.runDrain
       .provideSome[ZIOAppArgs](
         sdkLayer,
         Scope.default,

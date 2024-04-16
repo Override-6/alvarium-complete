@@ -1,13 +1,12 @@
-
 apiVersion: v1
 kind: Service
 metadata:
-  name: alvarium-workers-service
+  name: alvarium-workers
 
 spec:
   type: LoadBalancer
   selector:
-    app: alvarium
+    name: worker
   ports:
     - protocol: TCP
       port: 8080
@@ -19,15 +18,17 @@ kind: Deployment
 metadata:
   name: alvarium-workers
 
+
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: alvarium
+      name: worker
+
   template:
     metadata:
       labels:
-        app: alvarium
+        name: worker
     spec:
       containers:
         - name: alvarium-worker
@@ -38,24 +39,40 @@ spec:
 
 ---
 apiVersion: v1
+kind: Service
+metadata:
+  name: mosquitto-server
+
+spec:
+  selector:
+    name: mosquitto-server
+  clusterIP: None
+  ports:
+    - port: 1883
+---
+
+apiVersion: v1
 kind: Pod
 metadata:
-  name: mosquitto
+  name: mosquitto-server
+  labels:
+    name: mosquitto-server
 spec:
   containers:
-    - name: mosquitto
+    - name: mosquitto-server
       image: eclipse-mosquitto:latest
       volumeMounts:
-        - mountPath: "/config/mosquitto.conf:/mosquitto/config/mosquitto.conf"
+        - mountPath: "/mosquitto/config/"
           name: mosquitto-conf
 
       ports:
-        - containerPort: 1882
+        - containerPort: 1883
 
   volumes:
     - name: mosquitto-conf
       hostPath:
-        path: "/config/mosquitto.conf"
+        type: Directory
+        path: "/config/"
 ---
 
 apiVersion: v1
@@ -68,8 +85,8 @@ spec:
   selector:
     name: database
 
-
 ---
+
 apiVersion: v1
 kind: Pod
 metadata:
@@ -96,8 +113,10 @@ spec:
       volumeMounts:
         - mountPath: "/alvarium/data"
           name: data
+
   volumes:
     - name: data
       hostPath:
+        type: Directory
         path: "/ML-data"
 
