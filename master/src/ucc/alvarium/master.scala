@@ -7,7 +7,10 @@ import org.apache.logging.log4j.LogManager
 import ucc.alvarium.PropertyBag as PBag
 import zio.*
 import zio.http.*
+import zio.json.{DeriveJsonEncoder, JsonEncoder}
 import zio.stream.ZStream
+
+import java.util.Base64
 
 case class ImageInfo(id: String, gender: String, masterCategory: String, subCategory: String, articleType: String, baseColour: String, season: String, year: Int, usage: String, productDisplayName: String)
 
@@ -16,9 +19,16 @@ val tcount = java.lang.Runtime.getRuntime.availableProcessors()
 val images = (os.pwd / "data" / "images")
 
 val Address = "alvarium-workers"
+val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTP, Address, Some(8080)))
+
+
+case class ImageRequest(seed: String, signature: String, imageB64: String)
+
+given JsonEncoder[ImageRequest] = DeriveJsonEncoder.gen[ImageRequest]
+
 
 object master extends ZIOAppDefault {
-  def run  = {
+  def run = {
     val sdkLayer = ZLayer.succeed {
       val log = LogManager.getRootLogger
       val config = os.read(os.pwd / "config" / "config.json")
@@ -47,21 +57,25 @@ object master extends ZIOAppDefault {
         .mapZIOParUnordered(tcount) {
           case Array(id, gender, masterCategory, subCategory, articleType, baseColour, season, year, usage, displayName) =>
             ZIO.succeed(ImageInfo(id, gender, masterCategory, subCategory, articleType, baseColour, season, year.toInt, usage, displayName))
+          case other => ZIO.logError(s"cannot compute image ${other.mkString("Array(", ", ", ")")}") *> ZIO.dieMessage("received invalid image input")
         }
         .mapZIOParUnordered(tcount) { info =>
           for {
             sdk <- ZIO.service[Sdk]
-            _ <- Console.printLine("sdk retrieved")
-            body <- Body.fromFile((images / s"${info.id}.jpg").toIO)
-            _ <- Console.printLine("Body got")
-            response <- ZClient.request(Request(
-              method = Method.GET,
-              url = URL(Path(s"http://$Address:8080/compute")),
-              body = body
-            ))
-            _ <- Console.printLine("Request sent")
-          } yield response
+            fileContent = os.read.bytes(images / s"${info.id}.jpg")
+            json = JsonEncoder[ImageRequest].encodeJson(ImageRequest("seed", "signature", Base64.getEncoder.encodeToString(fileContent)))
+            body = Body.fromCharSequence(json)
+//            _ <- ZIO.attempt {
+//              sdk.create(json.toString.getBytes)
+//            }
+          } yield Request(
+            method = Method.GET,
+            url = ComputeURL,
+            body = body
+          )
         }
+        .mapZIO(ZClient.request(_))
+        .tap(Console.printLine(_))
     } yield ()
 
     Console.printLine("Running") &> stream.runDrain

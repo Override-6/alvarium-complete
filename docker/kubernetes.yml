@@ -108,8 +108,8 @@ metadata:
 spec:
   containers:
     - name: master
-      image: alvarium-master
-      imagePullPolicy: Never
+      image: alvarium-master:latest
+      imagePullPolicy: IfNotPresent
       volumeMounts:
         - mountPath: "/alvarium/data"
           name: data

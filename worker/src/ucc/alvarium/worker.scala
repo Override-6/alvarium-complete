@@ -10,6 +10,8 @@ import zio.*
 import zio.http.*
 import zio.json.{DeriveJsonDecoder, JsonDecoder}
 
+import scala.util.Try
+
 case class ImageRequest(seed: String, signature: String, imageB64: String)
 
 given JsonDecoder[ImageRequest] = DeriveJsonDecoder.gen[ImageRequest]
@@ -19,12 +21,16 @@ def computeImage(request: Request) = {
     sdk <- ZIO.service[Sdk]
     bag <- ZIO.service[PropertyBag]
     data <- request.body.asString
-    request <- ZIO.fromEither(JsonDecoder[ImageRequest].decodeJson(data))
-  } yield {
-    sdk.transit(bag, data.getBytes())
-  })
-    .catchAll(e => ZIO.logError(e.toString) &> ZIO.succeed(Response(Status.InternalServerError)))
-} &> ZIO.succeed(Response(
+    request <- ZIO.fromEither(JsonDecoder[ImageRequest].decodeJson(data)).catchAll(ZIO.dieMessage(_))
+    _ <- Console.printLine(s"processing image...")
+    _ <- ZIO.attempt {
+      println("transiting...")
+      sdk.transit(bag, data.getBytes())
+      println("transit done!")
+    }
+  } yield ())
+    .catchAll(e => ZIO.logErrorCause(Cause.die(e)) &> ZIO.succeed(Response(Status.InternalServerError, body = Body.fromString("error!"))))
+} *> ZIO.succeed(Response(
   status = Status.Ok,
   body = request.body
 ))
