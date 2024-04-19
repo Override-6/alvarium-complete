@@ -1,5 +1,4 @@
 import mill._
-import mill.api.Loose
 import mill.scalalib._
 
 trait AlvariumModule extends ScalaModule {
@@ -44,6 +43,7 @@ object sandbox extends AlvariumModule {
   override def otherDeps = Agg(
     ivy"dev.zio::zio:2.1-RC1",
     ivy"dev.zio::zio-streams:2.1-RC1",
+    ivy"dev.zio::zio-http:3.0.0-RC6",
   )
 }
 

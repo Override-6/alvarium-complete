@@ -5,13 +5,7 @@
       "kind": "tpm"
     },
     {
-      "kind": "tls"
-    },
-    {
       "kind": "pki"
-    },
-    {
-      "kind": "pki-http"
     },
     {
       "kind": "source-code"
@@ -21,11 +15,6 @@
     },
     {
       "kind": "src"
-    },
-    {
-      "kind": "sbom",
-      "type": "SPDX",
-      "version": "2.2.4"
     }
   ],
   "hash": {
@@ -49,7 +38,7 @@
       "user": "mosquitto",
       "password": "",
       "provider": {
-        "host": "mosquitto-server",
+        "host": "localhost",
         "protocol": "tcp",
         "port": 1883
       },

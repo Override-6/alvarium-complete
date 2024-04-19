@@ -6,38 +6,49 @@ import com.alvarium.utils.PropertyBag
 import com.alvarium.{DefaultSdk, Sdk, SdkInfo}
 import org.apache.logging.log4j.LogManager
 import ucc.alvarium.PropertyBag as PBag
-import zio.*
-import zio.http.*
+
+import scala.sys.exit
+
+
+import zio._
+import zio.http._
 import zio.json.{DeriveJsonDecoder, JsonDecoder}
 
-import scala.util.Try
-
-case class ImageRequest(seed: String, signature: String, imageB64: String)
+case class ImageRequest(seed: String, signature: String, id: String, imageB64: String)
 
 given JsonDecoder[ImageRequest] = DeriveJsonDecoder.gen[ImageRequest]
 
-def computeImage(request: Request) = {
+def computeImage(request: Request) = ZIO.logSpan("Request processing time") {
   (for {
     sdk <- ZIO.service[Sdk]
     bag <- ZIO.service[PropertyBag]
     data <- request.body.asString
-    request <- ZIO.fromEither(JsonDecoder[ImageRequest].decodeJson(data)).catchAll(ZIO.dieMessage(_))
-    _ <- Console.printLine(s"processing image...")
-    _ <- ZIO.attempt {
-      println("transiting...")
-      sdk.transit(bag, data.getBytes())
-      println("transit done!")
-    }
-  } yield ())
+
+    _ <- (ZIO.attempt {
+      try
+        sdk.transit(bag, data.getBytes())
+      catch
+        case e =>
+          e.printStackTrace()
+          exit()
+    }).fork
+  } yield Response(
+    status = Status.Ok,
+    body = request.body
+  ))
     .catchAll(e => ZIO.logErrorCause(Cause.die(e)) &> ZIO.succeed(Response(Status.InternalServerError, body = Body.fromString("error!"))))
-} *> ZIO.succeed(Response(
-  status = Status.Ok,
-  body = request.body
-))
+}
+
 
 object worker extends ZIOAppDefault {
   val app = Routes(
-    Method.GET / "compute" -> handler(computeImage(_))
+    Method.GET / "compute" -> handler(computeImage(_)),
+    Method.GET / "ping" -> handler(for {
+      _ <- Console.printLine("Pinged").orDie
+      chunk <- Random.nextBytes(2500)
+    } yield Response(
+      body = Body.fromChunk(chunk)
+    ))
   ).toHttpApp
 
   def run = {
@@ -55,7 +66,7 @@ object worker extends ZIOAppDefault {
         "./config-dir-checksum.txt"
       ),
       AnnotationType.CHECKSUM -> new ChecksumAnnotatorProps(
-        "./config/",
+        "./config/config.json",
         "./config-file-checksum.txt"
       ),
     ))
