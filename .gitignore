@@ -3,3 +3,5 @@ out
 lib
 .bsp
 data
+
+.lck

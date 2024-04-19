@@ -25,6 +25,9 @@ object master extends AlvariumModule {
     ivy"dev.zio::zio:2.1-RC1",
     ivy"dev.zio::zio-http:3.0.0-RC6",
     ivy"dev.zio::zio-json:0.6.2",
+    ivy"org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5",
+    ivy"io.getquill::quill-jdbc-zio:4.8.3",
+    ivy"org.postgresql:postgresql:42.3.1"
   )
 }
 object worker extends AlvariumModule {
