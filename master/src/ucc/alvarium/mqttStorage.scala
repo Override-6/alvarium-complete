@@ -1,17 +1,18 @@
 package ucc.alvarium
 
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
-import io.getquill._
+import io.getquill.{SnakeCase, jdbczio, query, *}
 import io.getquill.jdbczio.Quill
-import io.getquill.{SnakeCase, query, quote}
 import org.eclipse.paho.client.mqttv3.{IMqttMessageListener, MqttClient, MqttConnectOptions, MqttMessage}
-import org.postgresql.ds.PGSimpleDataSource
-import zio._
+import zio.*
+import zio.metrics.*
 import zio.json.{DeriveJsonDecoder, JsonDecoder, JsonStreamDelimiter}
-import zio.stream.ZStream
+import zio.metrics.Metric
+import zio.stream.{ZSink, ZStream}
 
-import java.util.Base64
-import javax.sql.DataSource
+import java.sql.Timestamp
+import java.text.SimpleDateFormat
+import java.util.{Base64, TimeZone}
 
 
 case class AlvariumActionDTO(action: String, messageType: String, content: String)
@@ -24,9 +25,19 @@ given JsonDecoder[AlvariumActionDTO] = DeriveJsonDecoder.gen[AlvariumActionDTO]
 given JsonDecoder[AlvariumAnnotationDTOSet] = DeriveJsonDecoder.gen[AlvariumAnnotationDTOSet]
 given JsonDecoder[AlvariumAnnotationDTO] = DeriveJsonDecoder.gen[AlvariumAnnotationDTO]
 
-case class AlvariumAnnotation(actionType: String, id: String, key: String, hash: String, host: String, tag: String, layer: String, kind: String, signature: String, isSatisfied: Boolean, timestamp: String)
+val dateFormat = {
+  val df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+  df.setTimeZone(TimeZone.getTimeZone("UTC"))
+  df
+}
 
-class DatabaseService(quill: Quill.Postgres[SnakeCase]) {
+extension (c: AlvariumAnnotationDTO) {
+  def toAnnotation(action: String): AlvariumAnnotation = AlvariumAnnotation(action, c.id, c.key, c.hash, c.host, c.tag, c.layer, c.kind, c.signature, c.isSatisfied, new Timestamp(dateFormat.parse(c.timestamp).getTime))
+}
+
+case class AlvariumAnnotation(actionType: String, id: String, key: String, hash: String, host: String, tag: String, layer: String, kind: String, signature: String, isSatisfied: Boolean, timestamp: Timestamp)
+
+class DatabaseService(quill: jdbczio.Quill.Postgres[SnakeCase]) {
 
   import quill._
 
@@ -41,9 +52,10 @@ object DatabaseService {
   val layer = ZLayer.fromFunction(new DatabaseService(_))
 }
 
+
 def mqttPipeline = {
 
-  val client = new MqttClient("tcp://localhost:1883", "mqtt-storage-client")
+  val client = new MqttClient("tcp://mosquitto-server:1883", "mqtt-storage-client")
   val options = new MqttConnectOptions()
   options.setAutomaticReconnect(true)
   options.setCleanSession(true)
@@ -51,33 +63,55 @@ def mqttPipeline = {
 
   client.connect(options)
 
-  val pipeline = (for {
+  //  val testPipeline = for {
+  //    _ <- Console.printLine("Testing...")
+  //    _ <- DatabaseService.addAnnotation(AlvariumAnnotation("a", "b", "c", "d", "e", "f", "g", "h", "i", true, Timestamp.from(Instant.now())))
+  //    _ <- Console.printLine("Testing done.")
+  //  } yield ()
+
+  val annotationCounter = Metric.counter("Annotations count").fromConst(1)
+  val publishCounter = Metric.counter("publish count").fromConst(1)
+
+  val pipeline = for {
     hub <- Hub.unbounded[MqttMessage]
     r <- ZIO.runtime
     _ <- ZIO.attempt {
       client.subscribe("alvarium-topic", ((_, msg) => r.unsafe.run {
-        hub.publish(msg)
+        for {
+          _ <- hub.publish(msg) @@ publishCounter
+          publishCount <- publishCounter.value
+          _ <- Console.printLine(s"publishing ($publishCount)")
+        } yield ()
       }): IMqttMessageListener)
     }
 
-    _ <- (for {
+
+    stream = for {
       msg <- ZStream.fromHub(hub)
+
       action <- ZStream.fromIterable(msg.getPayload).map(_.toChar) >>> JsonDecoder[AlvariumActionDTO].decodeJsonPipeline(JsonStreamDelimiter.Newline)
 
       annotationsJson = Base64.getDecoder.decode(action.content)
 
-      annotations <- (ZStream.fromIterable(annotationsJson).map(_.toChar) >>> JsonDecoder[AlvariumAnnotationDTOSet].decodeJsonPipeline(JsonStreamDelimiter.Newline))
-      .tap(a => Console.printLine("Inserting annotations inside database...") *> ZIO.foreach(a.items)(a => DatabaseService.addAnnotation(AlvariumAnnotation(action.action, a.id, a.key, a.hash, a.host, a.tag, a.layer, a.kind, a.signature, a.isSatisfied, a.timestamp))))
-    } yield ())
-      .runDrain
-
-  } yield ())
-    .catchAllCause(ZIO.logErrorCause(_))
+      annotations <- ZStream.fromIterable(annotationsJson).map(_.toChar) >>> JsonDecoder[AlvariumAnnotationDTOSet].decodeJsonPipeline(JsonStreamDelimiter.Newline)
+      annotation <- ZStream.fromIterable(annotations.items)
+    } yield annotation.toAnnotation(action.action)
+    _ <- stream.mapZIOParUnordered(TCount) { annotation =>
+      for {
+        counter <- annotationCounter.value
+        publishCounter <- publishCounter.value
+        _ <- Console.printLine(s"Inserting annotation inside database (count = ${counter.count})...")
+        _ <- DatabaseService.addAnnotation(annotation) @@ annotationCounter
+      } yield ()
+    }.runDrain
+  } yield ()
 
   pipeline
+    .catchAllCause(ZIO.logErrorCause(_))
     .provide(
       DatabaseService.layer,
       Quill.Postgres.fromNamingStrategy(SnakeCase),
-      Quill.DataSource.fromDataSource(new HikariDataSource(new HikariConfig("database.properties")))
+      Quill.DataSource.fromDataSource(new HikariDataSource(new HikariConfig("config/database.properties")))
     )
+
 }

@@ -20,7 +20,7 @@ metadata:
 
 
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       name: worker
@@ -76,15 +76,29 @@ spec:
 ---
 
 apiVersion: v1
+kind: Pod
+metadata:
+  name: mosquitto-client
+
+spec:
+  containers:
+    - name: moquitto-client
+      image: mosquitto-client:latest
+      imagePullPolicy: IfNotPresent
+
+---
+
+apiVersion: v1
 kind: Service
 metadata:
-  name: database-service
+  name: database
 
 spec:
   clusterIP: None
   selector:
     name: database
-
+  ports:
+    - port: 5432
 ---
 
 apiVersion: v1
@@ -97,6 +111,11 @@ spec:
   containers:
     - name: database
       image: postgres
+      env:
+        - name: POSTGRES_USER
+          value: alvarium
+        - name: POSTGRES_PASSWORD
+          value: "1234"
       ports:
         - containerPort: 5432
 
@@ -106,6 +125,7 @@ kind: Pod
 metadata:
   name: master
 spec:
+  restartPolicy: Never
   containers:
     - name: master
       image: alvarium-master:latest
@@ -113,6 +133,11 @@ spec:
       volumeMounts:
         - mountPath: "/alvarium/data"
           name: data
+
+  initContainers:
+    - name: db-init
+      image: db-init:latest
+      imagePullPolicy: IfNotPresent
 
   volumes:
     - name: data

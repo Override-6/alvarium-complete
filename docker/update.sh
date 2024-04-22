@@ -7,8 +7,12 @@ eval $(minikube docker-env)
 docker build -t alvarium-worker:latest -f docker/scala-node.dockerfile --build-arg name=worker .&
 A=$!
 docker build -t alvarium-master:latest -f docker/scala-node.dockerfile --build-arg name=master .&
+B=$!
+docker build -t db-init:latest -f docker/db-init.dockerfile .&
+C=$!
+docker build -t mosquitto-client:latest -f docker/mosquitto-client.dockerfile .&
 
-wait $! $A
+wait $! $A $B $C
 
 kubectl set image deployments/alvarium-workers alvarium-worker=alvarium-worker:latest
 kubectl delete pod master || true

@@ -1,5 +1,6 @@
-import zio._
-import zio.http._
+import zio.*
+import zio.http.*
+import zio.metrics.*
 
 object sandbox extends ZIOAppDefault {
 
@@ -7,12 +8,14 @@ object sandbox extends ZIOAppDefault {
 
   val NumberStr = "[0-9]+$".r
 
-  def run = ZIO.attempt {
-    "78" match {
-      case NumberStr(str) => println(s"number $str")
-      case _ => println("NaN")
-    }
-  }
+  def run =
+    val counter = Metric.counterInt("zizi").fromConst(1)
+    for {
+      _ <- ZIO.unit @@ counter
+      _ <- ZIO.unit @@ counter
+      counter <- counter.value
+      _ <- Console.printLine(s"counter : ${counter.count}")
+    } yield ()
 
 
 }

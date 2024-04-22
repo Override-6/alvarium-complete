@@ -38,7 +38,7 @@
       "user": "mosquitto",
       "password": "",
       "provider": {
-        "host": "localhost",
+        "host": "mosquitto-server",
         "protocol": "tcp",
         "port": 1883
       },
