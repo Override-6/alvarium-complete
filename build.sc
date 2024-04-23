@@ -13,7 +13,9 @@ trait AlvariumModule extends ScalaModule {
   override def ivyDeps = Agg(
     ivy"com.lihaoyi::os-lib:0.9.3",
     ivy"org.apache.logging.log4j:log4j-core:2.21.0",
-    ivy"com.google.code.findbugs:jsr305:2.0.2"
+    ivy"com.google.code.findbugs:jsr305:2.0.2",
+    ivy"dev.zio::zio:2.1-RC1",
+    ivy"dev.zio::zio-json:0.6.2",
   ) ++ otherDeps
 
   def otherDeps = Agg[Dep]()
@@ -22,7 +24,6 @@ trait AlvariumModule extends ScalaModule {
 object master extends AlvariumModule {
   override def moduleDeps = `alvarium-node` :: Nil
   override def otherDeps = Agg(
-    ivy"dev.zio::zio:2.1-RC1",
     ivy"dev.zio::zio-http:3.0.0-RC6",
     ivy"dev.zio::zio-json:0.6.2",
     ivy"org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5",
@@ -34,7 +35,6 @@ object worker extends AlvariumModule {
   override def moduleDeps = `alvarium-node` :: Nil
 
   override def otherDeps = Agg(
-    ivy"dev.zio::zio:2.1-RC1",
     ivy"dev.zio::zio-http:3.0.0-RC6",
     ivy"dev.zio::zio-json:0.6.2",
   )
@@ -43,8 +43,9 @@ object worker extends AlvariumModule {
 object `alvarium-node` extends AlvariumModule
 
 object sandbox extends AlvariumModule {
+  override def moduleDeps = `alvarium-node` :: Nil
+
   override def otherDeps = Agg(
-    ivy"dev.zio::zio:2.1-RC1",
     ivy"dev.zio::zio-streams:2.1-RC1",
     ivy"dev.zio::zio-http:3.0.0-RC6",
   )

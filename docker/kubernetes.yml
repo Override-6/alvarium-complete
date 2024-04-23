@@ -110,7 +110,7 @@ metadata:
 spec:
   containers:
     - name: database
-      image: postgres
+      image: postgres:latest
       env:
         - name: POSTGRES_USER
           value: alvarium
@@ -125,7 +125,7 @@ kind: Pod
 metadata:
   name: master
 spec:
-  restartPolicy: Never
+  restartPolicy: OnFailure
   containers:
     - name: master
       image: alvarium-master:latest

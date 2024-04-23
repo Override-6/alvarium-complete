@@ -6,19 +6,20 @@ import com.alvarium.streams.MqttConfig
 import com.alvarium.utils.PropertyBag
 import com.alvarium.{DefaultSdk, Sdk, SdkInfo}
 import org.apache.logging.log4j.LogManager
-import ucc.alvarium.{PropertyBag as PBag, config}
+import ucc.alvarium.{config, PropertyBag as PBag}
 
 import scala.sys.exit
 import zio.*
 import zio.http.*
-import zio.json.{DeriveJsonDecoder, JsonDecoder}
+import zio.json.{DeriveJsonDecoder, JsonDecoder, JsonEncoder}
 import zio.metrics.Metric
 
-case class ImageRequest(seed: String, signature: String, id: String, imageB64: String)
-
-given JsonDecoder[ImageRequest] = DeriveJsonDecoder.gen[ImageRequest]
+import java.util.Base64
 
 val transitCounter = Metric.counter("transit counter").fromConst(1)
+
+val Address = "alvarium-workers"
+val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTP, Address, Some(8080)))
 
 def computeImage(request: Request) = ZIO.logSpan("Request processing time") {
   (for {
@@ -27,10 +28,26 @@ def computeImage(request: Request) = ZIO.logSpan("Request processing time") {
     data <- request.body.asString
 
     counter <- transitCounter.value
-    _ <- (ZIO.attempt {
-      sdk.transit(bag, data.getBytes())
-    }.catchAllCause(ZIO.logErrorCause(_)) *> (Console.printLine(s"transited data (counter = ${counter.count})") @@ transitCounter))
+    _ <- ZIO.attempt {
+        sdk.transit(bag, data.getBytes())
+      }.catchAllCause(ZIO.logErrorCause(_))
       .forkDaemon
+
+
+    requestData <- ZIO.from(JsonDecoder[ImageRequest].decodeJson(data))
+    _ <- ZIO.when(requestData.remainingHopCount >= 0) {
+      val json = JsonEncoder[ImageRequest].encodeJson(requestData.copy(remainingHopCount = requestData.remainingHopCount - 1))
+      val body = Body.fromCharSequence(json)
+      ZIO.scoped {
+        ZClient.request(Request(
+          method = Method.GET,
+          url = ComputeURL,
+          body = body
+        ))
+      }
+    }.forkDaemon
+
+
   } yield Response(
     status = Status.Ok,
     body = request.body
@@ -54,7 +71,7 @@ object worker extends ZIOAppDefault {
     val sdkLayer = ZLayer.succeed {
       val log = LogManager.getRootLogger
       val sdkInfo = config
-      
+
       val annotators = sdkInfo.getAnnotators.map(new AnnotatorFactory().getAnnotator(_, sdkInfo, log))
       new DefaultSdk(annotators, sdkInfo, log)
     }
@@ -71,11 +88,13 @@ object worker extends ZIOAppDefault {
     ))
 
     val serverConfig = Server.default
+    val clientConfig = Client.default
 
     Server
       .serve(app)
       .provide(
         serverConfig,
+        clientConfig,
         sdkLayer,
         bag
       )

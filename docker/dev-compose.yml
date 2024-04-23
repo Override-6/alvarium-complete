@@ -1,0 +1,33 @@
+networks:
+  net:
+    driver: bridge
+
+services:
+  database:
+    image: postgres:latest
+    container_name: database
+    profiles: ["dev"]
+    environment:
+      POSTGRES_USER: alvarium
+      POSTGRES_PASSWORD: 1234
+    networks:
+      - net
+
+  mosquitto-server:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto-server
+    profiles: ["dev"]
+    volumes:
+      - "./mosquitto.conf:/mosquitto/config/"
+    networks:
+      - net
+
+  runner:
+    image: openjdk:22
+    working_dir: /app
+    profiles: ["dev-runner"]
+    volumes:
+      - "./data/:/app/data/"
+    networks:
+      - net
+

@@ -7,7 +7,11 @@ object master extends ZIOAppDefault {
   def run = {
 
 
-    val lines = os.read.lines(os.pwd / "data" / "styles.csv")
+    val lines = os.read
+      .lines
+      .stream(os.pwd / "data" / "styles.csv")
+      .take(2)
+      .toSeq
 
     for {
       f <- mqttPipeline.fork

@@ -2,13 +2,13 @@ package ucc.alvarium
 
 import com.alvarium.annotators.{AnnotatorFactory, ChecksumAnnotatorProps, SourceCodeAnnotatorProps}
 import com.alvarium.contracts.AnnotationType
-import com.alvarium.{DefaultSdk, Sdk, SdkInfo}
 import com.alvarium.utils.PropertyBag
-import ucc.alvarium.{PropertyBag as PBag, config}
+import com.alvarium.{DefaultSdk, Sdk}
 import org.apache.logging.log4j.LogManager
+import ucc.alvarium.{config, PropertyBag as PBag}
 import zio.*
-import zio.http.{Body, Method, Path, Request, Scheme, URL, ZClient}
-import zio.json.{DeriveJsonEncoder, JsonEncoder}
+import zio.http.*
+import zio.json.JsonEncoder
 import zio.metrics.Metric
 import zio.stream.ZStream
 
@@ -25,9 +25,6 @@ val Address = "alvarium-workers"
 val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTP, Address, Some(8080)))
 val NumberPattern = "([0-9]+)".r
 
-case class ImageRequest(seed: String, signature: String, id: String, imageB64: String)
-
-given JsonEncoder[ImageRequest] = DeriveJsonEncoder.gen[ImageRequest]
 
 def streamPipeline(lines: Iterable[String]) = {
 
@@ -70,12 +67,12 @@ def streamPipeline(lines: Iterable[String]) = {
         bytes <- Body.fromChunk(bytesChunk).asArray
 
         fileContent = bytes //os.read.bytes(ImagesDir / s"${info.id}.jpg")
-        json = JsonEncoder[ImageRequest].encodeJson(ImageRequest("seed", "signature", info.id, Base64.getEncoder.encodeToString(fileContent)))
+        json = JsonEncoder[ImageRequest].encodeJson(ImageRequest("seed", "signature", 5, info.id, Base64.getEncoder.encodeToString(fileContent)))
         body = Body.fromCharSequence(json)
 
-        //        _ <- ZIO.attempt {
-        //          sdk.create(bag, json.toString.getBytes)
-        //        }
+        _ <- ZIO.attempt {
+          sdk.create(bag, json.toString.getBytes)
+        }.catchAllCause(ZIO.logErrorCause(_)).forkDaemon
       } yield Request(
         method = Method.GET,
         url = ComputeURL,
