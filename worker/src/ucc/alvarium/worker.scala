@@ -2,37 +2,36 @@ package ucc.alvarium
 
 import com.alvarium.annotators.{AnnotatorFactory, ChecksumAnnotatorProps, SourceCodeAnnotatorProps}
 import com.alvarium.contracts.AnnotationType
-import com.alvarium.streams.MqttConfig
 import com.alvarium.utils.PropertyBag
-import com.alvarium.{DefaultSdk, Sdk, SdkInfo}
+import com.alvarium.{DefaultSdk, Sdk}
 import org.apache.logging.log4j.LogManager
-import ucc.alvarium.{config, mockConfig, PropertyBag as PBag}
-
-import scala.sys.exit
+import ucc.alvarium.PropertyBag as PBag
 import zio.*
 import zio.http.*
-import zio.http.Server.{Config, live}
-import zio.json.{DeriveJsonDecoder, JsonDecoder, JsonEncoder}
+import zio.json.{JsonDecoder, JsonEncoder}
 import zio.metrics.Metric
 
-import java.util.Base64
+import javax.net.ssl.SSLSocket
 
 val transitCounter = Metric.counter("transit counter").fromConst(1)
 
 val Address = "alvarium-workers"
-val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTPS, Address, Some(8080)))
+val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTP, Address, Some(8080)))
 
 def computeImage(request: Request) = ZIO.logSpan("Request processing time") {
   (for {
     sdk <- ZIO.service[Sdk]
     bag <- ZIO.service[PropertyBag]
     data <- request.body.asString
+    sslSocket <- ZIO.service[SSLSocket]
 
     _ <- ZIO.attempt {
+        println("session : " + sslSocket.getSession)
+        println("is closed : " + sslSocket.isClosed)
         sdk.transit(bag, data.getBytes())
       }.catchAllCause(ZIO.logErrorCause(_))
       .forkDaemon
-    
+
     requestData <- ZIO.from(JsonDecoder[ImageRequest].decodeJson(data))
     _ <- ZIO.when(requestData.remainingHopCount > 0) {
       val requestDataNew = requestData.copy(remainingHopCount = requestData.remainingHopCount - 1)
@@ -70,11 +69,26 @@ object worker extends ZIOAppDefault {
   def run = {
     val sdkLayer = ZLayer.succeed {
       val log = LogManager.getRootLogger
-      val sdkInfo = mockConfig
+      val sdkInfo = config
 
       val annotators = sdkInfo.getAnnotators.map(new AnnotatorFactory().getAnnotator(_, sdkInfo, log))
       new DefaultSdk(annotators, sdkInfo, log)
     }
+
+    val sslServerSocket = getServerSocket
+
+    new Thread(() => while (true) {
+      println("Accepting connexion...")
+      val socket = sslServerSocket.accept()
+
+      println("Accepted")
+      socket.setKeepAlive(true)
+      socket.getOutputStream.write(Array(1.toByte))
+      socket.getOutputStream.flush()
+    }).start()
+
+    val sslSocket = getClientSocket(Address)
+    sslSocket.getInputStream.read()
 
     val bag = ZLayer.succeed(PBag(
       AnnotationType.SourceCode -> new SourceCodeAnnotatorProps(
@@ -85,24 +99,22 @@ object worker extends ZIOAppDefault {
         "./config/config.json",
         "./config-file-checksum.txt"
       ),
+      AnnotationType.TLS -> sslSocket
     ))
 
-    val serverConfig = ZLayer.succeed(
-      Server.Config.default.ssl(SSLConfig.fromResource(
-        behaviour = SSLConfig.HttpBehaviour.Accept,
-        certPath = "./res/domain.csr",
-        keyPath = "./res/domain.key"
-      ))
-    ) >>> live
-    val clientConfig = Client.default
+    java.lang.Runtime.getRuntime.addShutdownHook(new Thread(() => {
+      sslSocket.close()
+      sslServerSocket.close()
+    }))
 
-    Server
+    Console.printLine("Server launched") *> Server
       .serve(app)
       .provide(
-        serverConfig,
-        clientConfig,
+        Server.default,
+        Client.default,
         sdkLayer,
-        bag
+        bag,
+        ZLayer.succeed(sslSocket)
       )
   }
 }

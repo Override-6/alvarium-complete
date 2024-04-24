@@ -26,4 +26,4 @@ COPY --from=builder /alvarium/config config
 COPY --from=builder /alvarium/config-file-checksum.txt .
 COPY --from=builder /alvarium/config-dir-checksum.txt .
 COPY --from=builder /alvarium/res res
-ENTRYPOINT java -jar out.jar
+ENTRYPOINT java -Dmule.security.model=custom -Drtf.allow.TLSv1.2 -jar out.jar

@@ -12,7 +12,9 @@ import zio.http.*
 import zio.metrics.*
 import ucc.alvarium.{mockConfig, PropertyBag as PBag}
 
+import java.net.{InetAddress, Socket}
 import java.util.Base64
+import javax.net.ssl.SSLSocketFactory
 
 object sandbox extends ZIOAppDefault {
 
@@ -22,12 +24,12 @@ object sandbox extends ZIOAppDefault {
 
   def run =
     val counter = Metric.counterInt("zizi").fromConst(1)
-    for {
-      _ <- ZIO.unit @@ counter
-      _ <- ZIO.unit @@ counter
-      counter <- counter.value
-      _ <- Console.printLine(s"counter : ${counter.count}")
-    } yield ()
+    (for {
+      response <- Client.request(Request(method = Method.GET, url = Url))
+      data <- response.body.asString
+      _ <- Console.printLine(data)
+    } yield ())
+      .provide(Scope.default, Client.default)
 }
 
 @main def main =
@@ -43,6 +45,8 @@ object sandbox extends ZIOAppDefault {
     val annotators = sdkInfo.getAnnotators.map(new AnnotatorFactory().getAnnotator(_, sdkInfo, log))
     new DefaultSdk(annotators, sdkInfo, log)
   }
+
+
 
   val bag = PBag(
     AnnotationType.SourceCode -> new SourceCodeAnnotatorProps(

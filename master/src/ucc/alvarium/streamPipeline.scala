@@ -7,14 +7,12 @@ import com.alvarium.{DefaultSdk, Sdk}
 import com.google.crypto.tink.PublicKeySign
 import com.google.crypto.tink.subtle.Ed25519Sign
 import org.apache.logging.log4j.LogManager
-import ucc.alvarium.{config, PropertyBag as PBag}
+import ucc.alvarium.PropertyBag as PBag
 import zio.*
 import zio.http.*
 import zio.json.JsonEncoder
 import zio.metrics.Metric
 import zio.stream.ZStream
-
-import java.util.Base64
 
 
 case class ImageInfo(id: String, gender: String, masterCategory: String, subCategory: String, articleType: String, baseColour: String, season: String, year: Int, usage: String, productDisplayName: String)
@@ -24,11 +22,13 @@ val TCount = java.lang.Runtime.getRuntime.availableProcessors()
 val ImagesDir = os.pwd / "data" / "images"
 
 val Address = "alvarium-workers"
-val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTPS, Address, Some(8080)))
+val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTP, Address, Some(8080)))
 val NumberPattern = "([0-9]+)".r
 
 
 def streamPipeline(lines: Iterable[String]) = {
+
+//  java.lang.System.setProperty("javax.net.debug", "ssl")
 
   val sdkLayer = ZLayer.succeed {
     val log = LogManager.getRootLogger
@@ -40,6 +40,9 @@ def streamPipeline(lines: Iterable[String]) = {
   val privateKey = os.read(os.pwd / "res" / "private.key")
   val signer = new Ed25519Sign(Encoder.hexToBytes(privateKey).take(32))
 
+  val sslSocket = getClientSocket(Address)
+  sslSocket.getInputStream.read()
+
   val bagLayer = ZLayer.succeed(PBag(
     AnnotationType.SourceCode -> new SourceCodeAnnotatorProps(
       "./config",
@@ -49,6 +52,7 @@ def streamPipeline(lines: Iterable[String]) = {
       "./config/config.json",
       "./config-file-checksum.txt"
     ),
+    AnnotationType.TLS -> sslSocket
   ))
 
   val okCounter = Metric.counter("OK counter").fromConst(1)
@@ -78,6 +82,8 @@ def streamPipeline(lines: Iterable[String]) = {
 
         
         _ <- ZIO.attempt {
+          println("session : " + sslSocket.getSession)
+          println("is closed : " + sslSocket.isClosed)
           sdk.create(bag, json.toString.getBytes)
         }.catchAllCause(ZIO.logErrorCause(_)).forkDaemon
       } yield Request(
@@ -93,15 +99,28 @@ def streamPipeline(lines: Iterable[String]) = {
         } @@ reqCounter
       }
     }
-  ZClient.Config.default.ssl(ClientSSLConfig.FromTrustStoreResource(
-    "./res/trustore.jks",
-    "123456"
-  ))
+
+//  val clientLayer = ZLayer.succeed(
+//    ZClient.Config.default.ssl(ClientSSLConfig.FromTrustStoreResource(
+//    "./res/client.truststore",
+//    "123456"
+//  )))
+
+
 
   for {
+    _ <- Console.printLine("Starting pipeline")
     _ <- pipeline
       .runDrain
-      .provide(sdkLayer, bagLayer, ZClient.default)
+      .provide(
+        sdkLayer,
+        bagLayer,
+        Client.default,
+//        Client.customized,
+//        NettyClientDriver.live,
+//        DnsResolver.default,
+//        ZLayer.succeed(NettyConfig.default),
+      )
     ok <- okCounter.value
     err <- errCounter.value
     req <- reqCounter.value
@@ -114,7 +133,7 @@ def streamPipeline(lines: Iterable[String]) = {
 def provideRequest(info: ImageInfo, fileContent: Array[Byte], signer: PublicKeySign) = {
   val content = Encoder.bytesToHex(fileContent)
   val seed = content.hashCode.toString
-  
+
   val signature = signer.sign(seed.getBytes)
   ImageRequest(seed, Encoder.bytesToHex(signature), 5, info.id, content)
 }

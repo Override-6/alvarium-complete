@@ -18,6 +18,8 @@ trait AlvariumModule extends ScalaModule {
     ivy"dev.zio::zio-json:0.6.2",
   ) ++ otherDeps
 
+  override def scalacOptions: Target[Seq[String]] = "-explain" :: Nil
+
   def otherDeps = Agg[Dep]()
 }
 

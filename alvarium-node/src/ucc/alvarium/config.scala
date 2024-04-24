@@ -53,6 +53,9 @@ def makeConfig(stream: StreamInfo): SdkInfo = new SdkInfo(
     new AnnotatorConfig(
       AnnotationType.SOURCE,
     ),
+    new AnnotatorConfig(
+      AnnotationType.TLS,
+    ),
   ),
   new HashInfo(
     HashType.SHA256Hash
