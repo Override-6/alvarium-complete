@@ -3,6 +3,6 @@
   //	name of the dev container
   "name": "idea-demo",
   //	Or use a Dockerfile here, more info: https://containers.dev/guide/dockerfile
-  "dockerFile":  "./docker/devcontainer.dockerfile"
+  "dockerFile":  "m./docker/devcontainer.dockerfile"
 
 }

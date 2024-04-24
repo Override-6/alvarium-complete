@@ -18,8 +18,17 @@ services:
     container_name: mosquitto-server
     profiles: ["dev"]
     volumes:
-      - "./mosquitto.conf:/mosquitto/config/"
+      - "../config:/mosquitto/config/"
     networks:
+      - net
+
+  mosquitto-client:
+    container_name: mosquitto-client
+    build: 
+      dockerfile: docker/mosquitto-client.dockerfile
+      context: ..
+    profiles: ["dev"]
+    networks: 
       - net
 
   runner:
@@ -27,7 +36,7 @@ services:
     working_dir: /app
     profiles: ["dev-runner"]
     volumes:
-      - "./data/:/app/data/"
+      - "../data/:/app/data/"
     networks:
       - net
 

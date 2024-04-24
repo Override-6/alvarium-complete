@@ -43,10 +43,14 @@ class DatabaseService(quill: jdbczio.Quill.Postgres[SnakeCase]) {
 
   def addAnnotation(annotation: AlvariumAnnotation) = run(query[AlvariumAnnotation].insertValue(lift(annotation)))
     .catchAllCause(ZIO.logErrorCause(_))
+
+  def addAnnotations(annotations: Iterable[AlvariumAnnotation]) = run(liftQuery(annotations).foreach(a => query[AlvariumAnnotation].insertValue(a)))
+    .catchAllCause(ZIO.logErrorCause(_))
 }
 
 object DatabaseService {
   def addAnnotation(annotation: AlvariumAnnotation) = ZIO.serviceWithZIO[DatabaseService](_.addAnnotation(annotation))
+  def addAnnotations(annotations: Iterable[AlvariumAnnotation]) = ZIO.serviceWithZIO[DatabaseService](_.addAnnotations(annotations))
 
 
   val layer = ZLayer.fromFunction(new DatabaseService(_))
@@ -96,12 +100,12 @@ def mqttPipeline = {
       annotations <- ZStream.fromIterable(annotationsJson).map(_.toChar) >>> JsonDecoder[AlvariumAnnotationDTOSet].decodeJsonPipeline(JsonStreamDelimiter.Newline)
       annotation <- ZStream.fromIterable(annotations.items)
     } yield annotation.toAnnotation(action.action)
-    _ <- stream.mapZIOParUnordered(TCount) { annotation =>
+    _ <- stream.groupedWithin(250, 3.seconds).mapZIOParUnordered(TCount) { annotations =>
       for {
         counter <- annotationCounter.value
         publishCounter <- publishCounter.value
         _ <- Console.printLine(s"Inserting annotation inside database (count = ${counter.count})...")
-        _ <- DatabaseService.addAnnotation(annotation) @@ annotationCounter
+        _ <- DatabaseService.addAnnotations(annotations) @@ annotationCounter
       } yield ()
     }.runDrain
   } yield ()

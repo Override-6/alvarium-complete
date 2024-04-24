@@ -2,8 +2,10 @@ package ucc.alvarium
 
 import com.alvarium.annotators.{AnnotatorFactory, ChecksumAnnotatorProps, SourceCodeAnnotatorProps}
 import com.alvarium.contracts.AnnotationType
-import com.alvarium.utils.PropertyBag
+import com.alvarium.utils.{Encoder, PropertyBag}
 import com.alvarium.{DefaultSdk, Sdk}
+import com.google.crypto.tink.PublicKeySign
+import com.google.crypto.tink.subtle.Ed25519Sign
 import org.apache.logging.log4j.LogManager
 import ucc.alvarium.{config, PropertyBag as PBag}
 import zio.*
@@ -22,7 +24,7 @@ val TCount = java.lang.Runtime.getRuntime.availableProcessors()
 val ImagesDir = os.pwd / "data" / "images"
 
 val Address = "alvarium-workers"
-val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTP, Address, Some(8080)))
+val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTPS, Address, Some(8080)))
 val NumberPattern = "([0-9]+)".r
 
 
@@ -34,6 +36,9 @@ def streamPipeline(lines: Iterable[String]) = {
     val annotators = sdkInfo.getAnnotators.map(new AnnotatorFactory().getAnnotator(_, sdkInfo, log))
     new DefaultSdk(annotators, sdkInfo, log)
   }
+
+  val privateKey = os.read(os.pwd / "res" / "private.key")
+  val signer = new Ed25519Sign(Encoder.hexToBytes(privateKey).take(32))
 
   val bagLayer = ZLayer.succeed(PBag(
     AnnotationType.SourceCode -> new SourceCodeAnnotatorProps(
@@ -67,9 +72,11 @@ def streamPipeline(lines: Iterable[String]) = {
         bytes <- Body.fromChunk(bytesChunk).asArray
 
         fileContent = bytes //os.read.bytes(ImagesDir / s"${info.id}.jpg")
-        json = JsonEncoder[ImageRequest].encodeJson(ImageRequest("seed", "signature", 5, info.id, Base64.getEncoder.encodeToString(fileContent)))
+        request = provideRequest(info, fileContent, signer)
+        json = JsonEncoder[ImageRequest].encodeJson(request)
         body = Body.fromCharSequence(json)
 
+        
         _ <- ZIO.attempt {
           sdk.create(bag, json.toString.getBytes)
         }.catchAllCause(ZIO.logErrorCause(_)).forkDaemon
@@ -86,6 +93,10 @@ def streamPipeline(lines: Iterable[String]) = {
         } @@ reqCounter
       }
     }
+  ZClient.Config.default.ssl(ClientSSLConfig.FromTrustStoreResource(
+    "./res/trustore.jks",
+    "123456"
+  ))
 
   for {
     _ <- pipeline
@@ -97,4 +108,13 @@ def streamPipeline(lines: Iterable[String]) = {
     _ <- Console.printLine(s"Counters : ok: ${ok.count} err: ${err.count} requests: ${req.count}")
     _ <- Console.printLine(s"total lines : ${lines.size}")
   } yield ()
+}
+
+
+def provideRequest(info: ImageInfo, fileContent: Array[Byte], signer: PublicKeySign) = {
+  val content = Encoder.bytesToHex(fileContent)
+  val seed = content.hashCode.toString
+  
+  val signature = signer.sign(seed.getBytes)
+  ImageRequest(seed, Encoder.bytesToHex(signature), 5, info.id, content)
 }

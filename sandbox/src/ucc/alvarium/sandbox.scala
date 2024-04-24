@@ -3,11 +3,16 @@ package ucc.alvarium
 import com.alvarium.DefaultSdk
 import com.alvarium.annotators.{AnnotatorFactory, ChecksumAnnotatorProps, SourceCodeAnnotatorProps}
 import com.alvarium.contracts.AnnotationType
+import com.alvarium.utils.Encoder
+import com.google.crypto.tink.PublicKeySign
+import com.google.crypto.tink.subtle.{Ed25519Sign, Ed25519Verify}
 import org.apache.logging.log4j.LogManager
 import zio.*
 import zio.http.*
 import zio.metrics.*
-import ucc.alvarium.{config, PropertyBag as PBag}
+import ucc.alvarium.{mockConfig, PropertyBag as PBag}
+
+import java.util.Base64
 
 object sandbox extends ZIOAppDefault {
 
@@ -23,8 +28,6 @@ object sandbox extends ZIOAppDefault {
       counter <- counter.value
       _ <- Console.printLine(s"counter : ${counter.count}")
     } yield ()
-
-
 }
 
 @main def main =
@@ -35,7 +38,7 @@ object sandbox extends ZIOAppDefault {
 
   val sdk = {
     val log = LogManager.getRootLogger
-    val sdkInfo = config
+    val sdkInfo = mockConfig
 
     val annotators = sdkInfo.getAnnotators.map(new AnnotatorFactory().getAnnotator(_, sdkInfo, log))
     new DefaultSdk(annotators, sdkInfo, log)
@@ -52,7 +55,16 @@ object sandbox extends ZIOAppDefault {
     ),
   )
 
-  println("Hello?")
+  val privateKey = os.read(os.pwd / "res" / "private.key")
+  val signer = new Ed25519Sign(Encoder.hexToBytes(privateKey).take(32))
+  
+  val signature = Encoder.bytesToHex(signer.sign("123456".getBytes))
 
-  sdk.create(bag, Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
+  val publicKey = os.read(os.pwd / "res" / "public.key")
+  
+  sdk.create(bag, s"""{"signature": "$signature", "seed": "123456"}""".getBytes())
+  
+  val verifier = new Ed25519Verify(Encoder.hexToBytes(publicKey))
+  verifier.verify(signature.getBytes, "123456".getBytes())
+
 

@@ -3,14 +3,13 @@ WORKDIR /alvarium
 
 
 ADD mill build.sc ./
-RUN ./mill resolve _
+ARG name
+RUN ./mill $name.resolvedIvyDeps
 
 ADD lib lib
 ADD alvarium-node alvarium-node
 
-ARG name
 ADD $name $name
-
 RUN ./mill $name.assembly
 
 ADD res res

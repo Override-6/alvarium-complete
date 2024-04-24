@@ -10,7 +10,33 @@ import com.alvarium.utils.ServiceInfo
 
 import java.util.UUID
 
-def config: SdkInfo = new SdkInfo(
+def config = makeConfig(
+  new StreamInfo(
+    StreamType.MQTT,
+    new MqttConfig(
+      UUID.randomUUID().toString,
+      "mosquitto",
+      "",
+      0,
+      false,
+      Array("alvarium-topic"),
+      new ServiceInfo(
+        "mosquitto-server",
+        "tcp",
+        1883
+      )
+    )
+  ),
+)
+
+def mockConfig = makeConfig(
+  new StreamInfo(
+    StreamType.MOCK,
+    null
+  )
+)
+
+def makeConfig(stream: StreamInfo): SdkInfo = new SdkInfo(
   Array(
     new AnnotatorConfig(
       AnnotationType.TPM,
@@ -43,22 +69,7 @@ def config: SdkInfo = new SdkInfo(
     )
   ),
 
-  new StreamInfo(
-    StreamType.MQTT,
-    new MqttConfig(
-      UUID.randomUUID().toString,
-       "mosquitto",
-      "",
-      0,
-      false,
-      Array("alvarium-topic"),
-      new ServiceInfo(
-        "mosquitto-server",
-        "tcp",
-        1883
-      )
-    )
-  ),
-
+  stream,
+  
   LayerType.Application
 )
