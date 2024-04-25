@@ -46,11 +46,11 @@ def streamPipeline(lines: Iterable[String]) = {
   val bagLayer = ZLayer.succeed(PBag(
     AnnotationType.SourceCode -> new SourceCodeAnnotatorProps(
       "./config",
-      "./config-dir-checksum.txt"
+      "res/config-dir-checksum.txt"
     ),
     AnnotationType.CHECKSUM -> new ChecksumAnnotatorProps(
       "./config/config.json",
-      "./config-file-checksum.txt"
+      "res/config-file-checksum.txt"
     ),
     AnnotationType.TLS -> sslSocket
   ))
@@ -64,7 +64,7 @@ def streamPipeline(lines: Iterable[String]) = {
     .mapZIOParUnordered(TCount) {
       case Array(id, gender, masterCategory, subCategory, articleType, baseColour, season, NumberPattern(year), usage, displayName) =>
         ZIO.some(ImageInfo(id, gender, masterCategory, subCategory, articleType, baseColour, season, year.toInt, usage, displayName)) @@ okCounter
-      case other => ZIO.logError(s"cannot compute image ${other.mkString("Array(", ", ", ")")}") *> ZIO.none @@ errCounter
+      case other => ZIO.logError(s"cannot compute image ${other.mkString("Array(", ", ", ")")}") &> ZIO.none @@ errCounter
     }
     .collectSome
     .mapZIOParUnordered(TCount) { info =>
@@ -80,10 +80,7 @@ def streamPipeline(lines: Iterable[String]) = {
         json = JsonEncoder[ImageRequest].encodeJson(request)
         body = Body.fromCharSequence(json)
 
-        
         _ <- ZIO.attempt {
-          println("session : " + sslSocket.getSession)
-          println("is closed : " + sslSocket.isClosed)
           sdk.create(bag, json.toString.getBytes)
         }.catchAllCause(ZIO.logErrorCause(_)).forkDaemon
       } yield Request(
@@ -95,7 +92,7 @@ def streamPipeline(lines: Iterable[String]) = {
     .mapZIOParUnordered(TCount) {
       case (r, id) => ZIO.logSpan("Request latency") {
         ZIO.scoped {
-          ZClient.request(r) //.tap(r => ZIO.log(s"Received response for image $id $r"))
+          ZClient.request(r).catchAllCause(ZIO.logErrorCause(_)) //.tap(r => ZIO.log(s"Received response for image $id $r"))
         } @@ reqCounter
       }
     }
@@ -109,7 +106,6 @@ def streamPipeline(lines: Iterable[String]) = {
 
 
   for {
-    _ <- Console.printLine("Starting pipeline")
     _ <- pipeline
       .runDrain
       .provide(

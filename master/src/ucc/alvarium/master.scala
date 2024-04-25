@@ -1,20 +1,29 @@
 package ucc.alvarium
 
 import zio.*
+import zio.profiling.sampling.SamplingProfiler
 
 
 object master extends ZIOAppDefault {
   def run = {
-        val lines = os.read
-          .lines
-          .stream(os.pwd / "data" / "styles.csv")
-          .toSeq
+    val lines = os.read
+      .lines
+      .stream(os.pwd / "data" / "styles.csv")
+      .take(200)
+      .toSeq
 
-        for {
-          f <- mqttPipeline.fork
-          _ <- streamPipeline(lines) <* Console.printLine("Done.")
-          _ <- ZIO.never// ZIO.sleep(5.seconds) &> Console.printLine("Waiting 5 seconds before mqtt client termination.")
-        } yield ()
+    val workflow = for {
+      f <- mqttPipeline.forkDaemon
+      _ <- streamPipeline(lines).either <* Console.printLine("Done.")
+      exit <- f.await
+      v <- exit.either
+      _ <- Console.printLine(s"MQTT Ended : $v")
+//      _ <-  ZIO.sleep(60.seconds) &> Console.printLine("Waiting 60 seconds before mqtt client termination.")
+    } yield ()
+
+    SamplingProfiler()
+      .profile(workflow)
+      .flatMap(_.stackCollapseToFile("./data/master.folded"))
   }
 }
 

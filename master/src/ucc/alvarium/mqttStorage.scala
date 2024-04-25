@@ -102,6 +102,7 @@ def mqttPipeline = {
     } yield annotation.toAnnotation(action.action)
     _ <- stream.groupedWithin(250, 3.seconds).mapZIOParUnordered(TCount) { annotations =>
       for {
+        _ <- ZIO.when(annotations.isEmpty) (ZIO.fail("received no annotations within the last three seconds."))
         counter <- annotationCounter.value
         publishCounter <- publishCounter.value
         _ <- Console.printLine(s"Inserting annotation inside database (count = ${counter.count})...")

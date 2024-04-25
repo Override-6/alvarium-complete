@@ -20,11 +20,11 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: alvarium-workers
+  name: alvarium-workers-tpm
 
 
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       name: worker
@@ -52,7 +52,37 @@ spec:
         - name: tpm-device
           hostPath:
             path: /dev/tpm0
+
 ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alvarium-workers-no-tpm
+
+
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      name: worker
+
+  template:
+    metadata:
+      labels:
+        name: worker
+    spec:
+      containers:
+        - name: alvarium-worker
+          image: alvarium-worker
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 8080
+            - containerPort: 5540
+
+---
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -89,17 +119,17 @@ spec:
         type: Directory
         path: "/config/"
 ---
-
-apiVersion: v1
-kind: Pod
-metadata:
-  name: mosquitto-client
-
-spec:
-  containers:
-    - name: moquitto-client
-      image: mosquitto-client:latest
-      imagePullPolicy: IfNotPresent
+#
+#apiVersion: v1
+#kind: Pod
+#metadata:
+#  name: mosquitto-client
+#
+#spec:
+#  containers:
+#    - name: moquitto-client
+#      image: mosquitto-client:latest
+#      imagePullPolicy: IfNotPresent
 
 ---
 
@@ -114,8 +144,39 @@ spec:
     name: database
   ports:
     - port: 5432
+
 ---
 
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: database-data-volume
+  labels:
+    type: local
+spec:
+  storageClassName: hostpath
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: /database
+  persistentVolumeReclaimPolicy: Delete
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: database-data-storage-claim
+spec:
+  storageClassName: hostpath
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+
+---
 apiVersion: v1
 kind: Pod
 metadata:
@@ -123,6 +184,8 @@ metadata:
   labels:
     name: database
 spec:
+  securityContext:
+    runAsUser: 1000
   containers:
     - name: database
       image: postgres:latest
@@ -133,14 +196,22 @@ spec:
           value: "1234"
       ports:
         - containerPort: 5432
+      volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: database-data
+  volumes:
+    - name: database-data
+      persistentVolumeClaim:
+        claimName: database-data-storage-claim
 
 ---
 apiVersion: v1
 kind: Pod
 metadata:
   name: master
+
 spec:
-  restartPolicy: OnFailure
+  restartPolicy: Never
   containers:
     - name: master
       image: alvarium-master:latest
