@@ -11,7 +11,6 @@ object sandbox extends ZIOAppDefault {
 
   private val NumberStr = "[0-9]+$".r
 
-
   private def work(n: Int) = ZStream.fromSchedule(Schedule.recurs(n))
     .foreach(idx => Console.printLine(idx))
 
@@ -19,7 +18,10 @@ object sandbox extends ZIOAppDefault {
     val fast = work(500)
     val slow = work(1000)
 
-    val program = fast <&> slow
+    val program = for {
+      f <- (fast <&> slow).fork
+      _ <- f.await
+    } yield ()
 
     SamplingProfiler(1.nano)
       .profile(program)

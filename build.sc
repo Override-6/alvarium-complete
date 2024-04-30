@@ -10,17 +10,12 @@ trait AlvariumModule extends ScalaModule {
     )
   }
 
-//  override def scalacPluginIvyDeps = Agg(
-//    ivy"dev.zio::zio-profiling-tagging-plugin:0.3.0"
-//  )
-
   override def ivyDeps = Agg(
     ivy"com.lihaoyi::os-lib:0.9.3",
     ivy"org.apache.logging.log4j:log4j-core:2.21.0",
     ivy"com.google.code.findbugs:jsr305:2.0.2",
     ivy"dev.zio::zio:2.1-RC1",
     ivy"dev.zio::zio-json:0.6.2",
-    ivy"dev.zio::zio-profiling:0.3.0",
   ) ++ otherDeps
 
   override def scalacOptions: Target[Seq[String]] = "-explain" :: Nil

@@ -10,7 +10,6 @@ import zio.*
 import zio.http.*
 import zio.json.{JsonDecoder, JsonEncoder}
 import zio.metrics.Metric
-import zio.profiling.sampling.SamplingProfiler
 
 import java.net.InetAddress
 import java.util.concurrent.ThreadLocalRandom
@@ -115,7 +114,7 @@ object worker extends ZIOAppDefault {
       sslServerSocket.close()
     }))
 
-    val workflow = for {
+    for {
       _ <- ZIO.when(probably(TLSDefectProbability)) {
         ZIO.attempt {
           sslSocket.close()
@@ -131,12 +130,6 @@ object worker extends ZIOAppDefault {
           ZLayer.succeed(sslSocket)
         )
     } yield ()
-
-    val hostname = InetAddress.getLocalHost.getHostName
-
-    SamplingProfiler()
-      .profile(workflow)
-      .map(_.stackCollapseToFile(s"data/profiling-$hostname.folded"))
   }
 }
 

@@ -1,14 +1,13 @@
 package ucc.alvarium
 
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
-import io.getquill.{SnakeCase, jdbczio, query, *}
 import io.getquill.jdbczio.Quill
+import io.getquill.{SnakeCase, jdbczio, query, *}
 import org.eclipse.paho.client.mqttv3.{IMqttMessageListener, MqttClient, MqttConnectOptions, MqttMessage}
 import zio.*
-import zio.metrics.*
 import zio.json.{DeriveJsonDecoder, JsonDecoder, JsonStreamDelimiter}
 import zio.metrics.Metric
-import zio.stream.{ZSink, ZStream}
+import zio.stream.ZStream
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
@@ -39,7 +38,7 @@ case class AlvariumAnnotation(actionType: String, id: String, key: String, hash:
 
 class DatabaseService(quill: jdbczio.Quill.Postgres[SnakeCase]) {
 
-  import quill._
+  import quill.*
 
   def addAnnotation(annotation: AlvariumAnnotation) = run(query[AlvariumAnnotation].insertValue(lift(annotation)))
     .catchAllCause(ZIO.logErrorCause(_))
@@ -55,7 +54,6 @@ object DatabaseService {
 
   val layer = ZLayer.fromFunction(new DatabaseService(_))
 }
-
 
 def mqttPipeline = {
 
@@ -100,9 +98,11 @@ def mqttPipeline = {
       annotations <- ZStream.fromIterable(annotationsJson).map(_.toChar) >>> JsonDecoder[AlvariumAnnotationDTOSet].decodeJsonPipeline(JsonStreamDelimiter.Newline)
       annotation <- ZStream.fromIterable(annotations.items)
     } yield annotation.toAnnotation(action.action)
-    _ <- stream.groupedWithin(250, 3.seconds).mapZIOParUnordered(TCount) { annotations =>
+    _ <- stream
+      .timeout(7.seconds)
+      .groupedWithin(250, 3.seconds)
+      .mapZIOParUnordered(TCount) { annotations =>
       for {
-        _ <- ZIO.when(annotations.isEmpty) (ZIO.fail("received no annotations within the last three seconds."))
         counter <- annotationCounter.value
         publishCounter <- publishCounter.value
         _ <- Console.printLine(s"Inserting annotation inside database (count = ${counter.count})...")

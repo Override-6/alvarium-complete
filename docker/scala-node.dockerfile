@@ -15,11 +15,15 @@ RUN ./mill $name.assembly
 ADD res res
 ADD config config
 
-FROM eclipse-temurin:22-alpine as runtime
+FROM ubuntu:latest as runtime
 WORKDIR /alvarium
 ARG name
+
+RUN apt update
+RUN apt install -y openjdk-21-jdk
 
 COPY --from=builder /alvarium/out/$name/assembly.dest/out.jar .
 COPY --from=builder /alvarium/config config
 COPY --from=builder /alvarium/res res
-ENTRYPOINT java -Dmule.security.model=custom -Drtf.allow.TLSv1.2 -jar out.jar
+ENTRYPOINT java -agentpath:/jprofiler/bin/linux-x64/libjprofilerti.so=port=8849 -jar out.jar
+#ENTRYPOINT java -jar out.jar

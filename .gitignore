@@ -3,7 +3,9 @@ out
 lib
 .bsp
 data
+database
+profilings
+
 
 .lck
 
-database

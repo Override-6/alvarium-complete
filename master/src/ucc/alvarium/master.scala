@@ -1,7 +1,6 @@
 package ucc.alvarium
 
 import zio.*
-import zio.profiling.sampling.SamplingProfiler
 
 
 object master extends ZIOAppDefault {
@@ -9,7 +8,7 @@ object master extends ZIOAppDefault {
     val lines = os.read
       .lines
       .stream(os.pwd / "data" / "styles.csv")
-      .take(200)
+      .take(10000)
       .toSeq
 
     val workflow = for {
@@ -18,12 +17,11 @@ object master extends ZIOAppDefault {
       exit <- f.await
       v <- exit.either
       _ <- Console.printLine(s"MQTT Ended : $v")
+      _ <- ZIO.never
 //      _ <-  ZIO.sleep(60.seconds) &> Console.printLine("Waiting 60 seconds before mqtt client termination.")
     } yield ()
 
-    SamplingProfiler()
-      .profile(workflow)
-      .flatMap(_.stackCollapseToFile("./data/master.folded"))
+    workflow
   }
 }
 

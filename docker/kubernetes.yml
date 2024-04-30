@@ -34,6 +34,7 @@ spec:
     metadata:
       labels:
         name: worker
+
     spec:
       containers:
         - name: alvarium-worker
@@ -47,12 +48,30 @@ spec:
           volumeMounts:
             - mountPath: "/dev/tpm0"
               name: tpm-device
-
+            - mountPath: /profiler
+              name: profiler
+            - mountPath: /.profiler
+              name: profiler-config
+#            - mountPath: /lib64
+#              name: lib64
+#            - mountPath: /lib/x86_64-linux-gnu/
+#              name: lib64-content
       volumes:
         - name: tpm-device
           hostPath:
             path: /dev/tpm0
-
+        - name: profiler
+          hostPath:
+            path: /jprofiler
+        - name: profiler-config
+          hostPath:
+            path: /.jprofiler
+        - name: lib64
+#          hostPath:
+#            path: /lib64
+#        - name: lib64-content
+#          hostPath:
+#            path: /lib/x86_64-linux-gnu/
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -80,7 +99,28 @@ spec:
           ports:
             - containerPort: 8080
             - containerPort: 5540
-
+          volumeMounts:
+            - mountPath: /jprofiler
+              name: profiler
+            - mountPath: /.jprofiler
+              name: profiler-config
+#            - mountPath: /lib64
+#              name: lib64
+#            - mountPath: /lib/x86_64-linux-gnu/
+#              name: lib64-content
+      volumes:
+        - name: profiler
+          hostPath:
+            path: /jprofiler
+        - name: profiler-config
+          hostPath:
+            path: /.jprofiler
+#        - name: lib64
+#          hostPath:
+#            path: /lib64
+#        - name: lib64-content
+#          hostPath:
+#            path: /lib/x86_64-linux-gnu/
 ---
 
 apiVersion: v1
@@ -222,6 +262,15 @@ spec:
         - mountPath: "/dev/tpm0"
           name: tpm-device
           readOnly: false
+        - mountPath: /jprofiler
+          name: profiler
+        - mountPath: /.jprofiler
+          name: profiler-config
+#        - mountPath: /lib64
+#          name: lib64
+#        - mountPath: /lib/x86_64-linux-gnu/
+#          name: lib64-content
+
       securityContext:
         privileged: true
 
@@ -238,3 +287,15 @@ spec:
     - name: tpm-device
       hostPath:
         path: /dev/tpm0
+    - name: profiler
+      hostPath:
+        path: /jprofiler
+    - name: profiler-config
+      hostPath:
+        path: /.jprofiler
+#    - name: lib64
+#      hostPath:
+#        path: /lib64
+#    - name: lib64-content
+#      hostPath:
+#        path: /lib/x86_64-linux-gnu/

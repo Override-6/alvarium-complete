@@ -14,8 +14,8 @@ docker build -t mosquitto-client:latest -f docker/mosquitto-client.dockerfile .&
 
 wait $! $A $B $C
 
-kubectl set image deployments/alvarium-workers-tpm alvarium-worker=alvarium-worker:latest
-kubectl set image deployments/alvarium-workers-no-tpm alvarium-worker=alvarium-worker:latest
+kubectl set image deployments/alvarium-workers-tpm alvarium-worker=alvarium-worker:latest || true
+kubectl set image deployments/alvarium-workers-no-tpm alvarium-worker=alvarium-worker:latest || true
 kubectl delete pod master || true
 kubectl apply -f docker/kubernetes.yml
 
