@@ -10,7 +10,16 @@ import com.alvarium.utils.ServiceInfo
 
 import java.util.UUID
 
-def config = makeConfig(
+val AllSupportedAnnotations = Seq(
+  AnnotationType.PKI,
+  AnnotationType.SourceCode,
+  AnnotationType.CHECKSUM,
+  AnnotationType.SOURCE,
+  AnnotationType.TLS,
+  AnnotationType.TPM,
+)
+
+def config(annotations: AnnotationType*): SdkInfo = makeConfig(
   new StreamInfo(
     StreamType.MQTT,
     new MqttConfig(
@@ -27,36 +36,28 @@ def config = makeConfig(
       )
     )
   ),
+  annotations *
 )
 
-def mockConfig = makeConfig(
+def config: SdkInfo = config(
+  AllSupportedAnnotations *
+)
+
+def mockConfig(annotations: AnnotationType*): SdkInfo = makeConfig(
   new StreamInfo(
     StreamType.MOCK,
     null
-  )
+  ),
+  annotations *
 )
 
-def makeConfig(stream: StreamInfo): SdkInfo = new SdkInfo(
-  Array(
-    new AnnotatorConfig(
-      AnnotationType.TPM,
-    ),
-    new AnnotatorConfig(
-      AnnotationType.PKI,
-    ),
-    new AnnotatorConfig(
-      AnnotationType.SourceCode,
-    ),
-    new AnnotatorConfig(
-      AnnotationType.CHECKSUM,
-    ),
-    new AnnotatorConfig(
-      AnnotationType.SOURCE,
-    ),
-    new AnnotatorConfig(
-      AnnotationType.TLS,
-    ),
-  ),
+def mockConfig: SdkInfo = mockConfig(
+  AllSupportedAnnotations *
+)
+
+def makeConfig(stream: StreamInfo, annotations: AnnotationType*): SdkInfo = new SdkInfo(
+  annotations.map(new AnnotatorConfig(_)).toArray,
+
   new HashInfo(
     HashType.SHA256Hash
   ),
@@ -73,6 +74,6 @@ def makeConfig(stream: StreamInfo): SdkInfo = new SdkInfo(
   ),
 
   stream,
-  
+
   LayerType.Application
 )

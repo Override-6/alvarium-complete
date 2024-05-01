@@ -43,6 +43,10 @@ object worker extends AlvariumModule {
 }
 
 object `alvarium-node` extends AlvariumModule
+object `benchmark` extends ScalaModule {
+  def scalaVersion = "3.4.0"
+  override def moduleDeps = `alvarium-node` :: Nil
+}
 
 object sandbox extends AlvariumModule {
   override def moduleDeps = `alvarium-node` :: Nil

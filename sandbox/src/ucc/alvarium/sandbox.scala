@@ -2,7 +2,6 @@ package ucc.alvarium
 
 import zio.*
 import zio.http.*
-import zio.profiling.sampling.SamplingProfiler
 import zio.stream.ZStream
 
 object sandbox extends ZIOAppDefault {
@@ -23,9 +22,7 @@ object sandbox extends ZIOAppDefault {
       _ <- f.await
     } yield ()
 
-    SamplingProfiler(1.nano)
-      .profile(program)
-      .flatMap(_.stackCollapseToFile("/tmp/test.folded"))
+    program
 }
 
 //@main def main =

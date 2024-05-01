@@ -32,7 +32,7 @@ services:
     depends_on:
       - worker
       - mosquitto-server
-    image: alvarium-master:latest
+    image: alvarium-benchmark:latest
     container_name: master
     networks:
       - net

@@ -22,8 +22,8 @@ val TCount = java.lang.Runtime.getRuntime.availableProcessors()
 val ImagesDir = os.pwd / "data" / "images"
 
 val Address = "alvarium-workers"
-val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTP, Address, Some(8080)))
 val NumberPattern = "([0-9]+)".r
+val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTP, Address, Some(8080)))
 
 
 def streamPipeline(lines: Iterable[String]) = {

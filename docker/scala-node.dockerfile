@@ -4,7 +4,7 @@ WORKDIR /alvarium
 
 ADD mill build.sc ./
 ARG name
-RUN ./mill $name.resolvedIvyDeps
+RUN ./mill $name.prepareOffline
 
 ADD lib lib
 ADD alvarium-node alvarium-node
@@ -25,5 +25,5 @@ RUN apt install -y openjdk-21-jdk
 COPY --from=builder /alvarium/out/$name/assembly.dest/out.jar .
 COPY --from=builder /alvarium/config config
 COPY --from=builder /alvarium/res res
-ENTRYPOINT java -agentpath:/jprofiler/bin/linux-x64/libjprofilerti.so=port=8849 -jar out.jar
-#ENTRYPOINT java -jar out.jar
+#ENTRYPOINT java -agentpath:/jprofiler/bin/linux-x64/libjprofilerti.so=port=8849 -jar out.jar
+ENTRYPOINT java -jar out.jar
