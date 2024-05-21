@@ -1,15 +1,15 @@
 package ucc.alvarium
 
-import com.alvarium.{DefaultSdk, Sdk}
-import com.alvarium.annotators.{AnnotatorFactory, EnvironmentCheckerEntry, ChecksumAnnotatorProps, SourceCodeAnnotatorProps}
+import com.alvarium.DefaultSdk
+import com.alvarium.annotators.{AnnotatorFactory, EnvironmentCheckerEntry}
+//import com.alvarium.annotators.AnnotatorFactory
 import com.alvarium.contracts.AnnotationType
 import com.alvarium.utils.{Encoder, PropertyBag}
 import com.google.crypto.tink.PublicKeySign
 import com.google.crypto.tink.subtle.Ed25519Sign
 import org.apache.logging.log4j.LogManager
-import ucc.alvarium.config
-import zio.json.JsonEncoder
 import ucc.alvarium.PropertyBag as PBag
+import zio.json.JsonEncoder
 
 import java.time.{Duration, Instant}
 
@@ -21,43 +21,38 @@ val NumberPattern = "([0-9]+)".r
 
 
 @main def bench = {
-
-  Thread.sleep(1000)
-
   val privateKey = os.read(os.pwd / "res" / "private.key")
 
   given PublicKeySign = new Ed25519Sign(Encoder.hexToBytes(privateKey).take(32))
 
-  val sslSocket = getClientSocket(Address)
-  sslSocket.getInputStream.read()
-
   given PropertyBag = PBag(
-    AnnotationType.SourceCode -> new SourceCodeAnnotatorProps(
-      "./config",
-      "res/config-dir-checksum.txt"
-    ),
-    AnnotationType.CHECKSUM -> new ChecksumAnnotatorProps(
-      "./config/config.json",
-      "res/config-file-checksum.txt"
-    ),
-    AnnotationType.TLS -> sslSocket
+//    AnnotationType.SourceCode -> new SourceCodeAnnotatorProps(
+//      "./config",
+//      "res/config-dir-checksum.txt"
+//    ),
+//    AnnotationType.CHECKSUM -> new ChecksumAnnotatorProps(
+//      "./config/config.json",
+//      "res/config-file-checksum.txt"
+//    ),
+//    AnnotationType.TLS -> sslSocket
   )
 
-  runBench(10000, 20000)(AnnotationType.TLS)
-  runBench(10000, 20000)((AnnotationType.TLS :: Nil) * 5*)
-  runBench(10000, 20000)((AnnotationType.TLS :: Nil) * 10*)
+  runBench(5000, 20000)()
+  runBench(5000, 20000)(AnnotationType.SOURCE)
+  runBench(5000, 20000)((AnnotationType.SOURCE :: Nil) * 3*)
+  runBench(5000, 20000)((AnnotationType.SOURCE :: Nil) * 5*)
+  runBench(5000, 20000)((AnnotationType.SOURCE :: Nil) * 7*)
+  runBench(5000, 20000)((AnnotationType.SOURCE :: Nil) * 10*)
   println("---")
-  runBench(10000, 40000)(AnnotationType.TLS)
-  runBench(10000, 40000)((AnnotationType.TLS :: Nil) * 5*)
-  runBench(10000, 40000)((AnnotationType.TLS :: Nil) * 10*)
-  println("---")
-  runBench(5000, 80000)(AnnotationType.TLS)
-  runBench(5000, 80000)((AnnotationType.TLS :: Nil) * 5*)
-  runBench(5000, 80000)((AnnotationType.TLS :: Nil) * 10*)
-  println("---")
-  runBench(20000, 100)(AnnotationType.TLS)
-  runBench(20000, 100)((AnnotationType.TLS :: Nil) * 5*)
-  runBench(20000, 100)((AnnotationType.TLS :: Nil) * 10*)
+
+  runBench(5000, 0)((AnnotationType.SOURCE :: Nil) * 5 *)
+  runBench(5000, 1000)((AnnotationType.SOURCE :: Nil) * 5 *)
+  runBench(5000, 5000)((AnnotationType.SOURCE :: Nil) * 5 *)
+  runBench(5000, 10000)((AnnotationType.SOURCE :: Nil) * 5 *)
+  runBench(5000, 20000)((AnnotationType.SOURCE :: Nil) * 5 *)
+  runBench(5000, 80000)((AnnotationType.SOURCE :: Nil) * 5 *)
+
+  println("END")
 }
 
 extension [A](that: Seq[A])
@@ -74,6 +69,7 @@ def runBench(iterationCount: Int, dataSize: Int)(annotations: AnnotationType*)(u
     val sdkInfo = config(annotations*)
     val annotators = sdkInfo.getAnnotators
       .map(cfg => new EnvironmentCheckerEntry(cfg.getKind(), new AnnotatorFactory().getAnnotator(cfg, sdkInfo, log)))
+//    val annotators = sdkInfo.getAnnotators.map(new AnnotatorFactory().getAnnotator(_, sdkInfo, log))
     new DefaultSdk(annotators, sdkInfo, log)
   }
 
@@ -87,19 +83,18 @@ def runBench(iterationCount: Int, dataSize: Int)(annotations: AnnotationType*)(u
 }
 
 def measure(label: String, count: Int)(f: => Unit): Unit = {
-  //println(s"$label :")
   val tries = for (i <- 1 to count) yield {
     System.gc()
-//    println(s"\t- try $i")
     val t0 = Instant.now()
     f
     val t1 = Instant.now()
     val duration = Duration.between(t0, t1)
-//    println(s"\t$label - Time took : $duration")
     duration.toMillis
   }
-  val avg = tries.sum / tries.size
-  println(s"$label - Average time : ${Duration.ofMillis(avg)}")
+  val min = Duration.ofMillis(tries.min)
+  val max = Duration.ofMillis(tries.max)
+  val avg = Duration.ofMillis(tries.sum / tries.size)
+  println(s"$label - min: $min avg: $avg max: $max")
 }
 
 def provideRequest(id: String, fileContent: Array[Byte], signer: PublicKeySign) = {

@@ -1,6 +1,6 @@
 package ucc.alvarium
 
-import com.alvarium.annotators.{AnnotatorFactory, ChecksumAnnotatorProps, SourceCodeAnnotatorProps}
+import com.alvarium.annotators.{AnnotatorFactory, EnvironmentCheckerEntry, ChecksumAnnotatorProps, SourceCodeAnnotatorProps}
 import com.alvarium.contracts.AnnotationType
 import com.alvarium.utils.{Encoder, PropertyBag}
 import com.alvarium.{DefaultSdk, Sdk}
@@ -33,7 +33,8 @@ def streamPipeline(lines: Iterable[String]) = {
   val sdkLayer = ZLayer.succeed {
     val log = LogManager.getRootLogger
     val sdkInfo = config
-    val annotators = sdkInfo.getAnnotators.map(new AnnotatorFactory().getAnnotator(_, sdkInfo, log))
+    val annotators = sdkInfo.getAnnotators
+      .map(cfg => new EnvironmentCheckerEntry(cfg.getKind(), new AnnotatorFactory().getAnnotator(cfg, sdkInfo, log)))
     new DefaultSdk(annotators, sdkInfo, log)
   }
 

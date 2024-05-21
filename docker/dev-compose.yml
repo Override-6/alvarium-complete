@@ -20,6 +20,15 @@ services:
     networks:
       - net
 
+#  mosquitto-client:
+#    image: mosquitto-client
+#    container_name: mosquitto-client
+#    depends_on:
+#      - mosquitto-server
+#    networks:
+#      - net
+
+
   worker:
     depends_on:
       - mosquitto-server
