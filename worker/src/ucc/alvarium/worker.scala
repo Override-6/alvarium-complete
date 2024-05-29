@@ -1,6 +1,6 @@
 package ucc.alvarium
 
-import com.alvarium.annotators.{AnnotatorFactory, EnvironmentCheckerEntry, ChecksumAnnotatorProps, SourceCodeAnnotatorProps}
+import com.alvarium.annotators.{AnnotatorFactory, ChecksumAnnotatorProps, EnvironmentCheckerEntry, SourceCodeAnnotatorProps}
 import com.alvarium.contracts.AnnotationType
 import com.alvarium.utils.PropertyBag
 import com.alvarium.{DefaultSdk, Sdk}
@@ -9,16 +9,16 @@ import ucc.alvarium.PropertyBag as PBag
 import zio.*
 import zio.http.*
 import zio.json.{JsonDecoder, JsonEncoder}
-import zio.metrics.Metric
 
 import java.net.InetAddress
 import java.util.concurrent.ThreadLocalRandom
 import javax.net.ssl.SSLSocket
 
-val transitCounter = Metric.counter("transit counter").fromConst(1)
 
-val Address = "alvarium-workers"
-val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTP, Address, Some(8080)))
+val WorkersAddress = "alvarium-workers"
+val StorageAddress = "alvarium-storage"
+val ComputeURL = URL(Path(s"compute"), URL.Location.Absolute(Scheme.HTTP, WorkersAddress, Some(8080)))
+val StorageURL = URL(Path(s"storage"), URL.Location.Absolute(Scheme.HTTP, StorageAddress, Some(8080)))
 
 val TLSDefectProbability = 0.25F
 val SourceCodeDefectProbability = 0.25F
@@ -27,34 +27,39 @@ val PKIDefectProbability = 0.25F / 5
 
 def computeImage(request: Request) = ZIO.logSpan("Request processing time") {
   (for {
-    sdk <- ZIO.service[Sdk] @@ transitCounter
-    bag <- ZIO.service[PropertyBag]
+    sdk <- ZIO.service[Sdk]
     data <- request.body.asString
     sslSocket <- ZIO.service[SSLSocket]
 
+    bag <- ZIO.service[PropertyBag]
+
+    requestData <- ZIO.fromEither(JsonDecoder[ImageRequest].decodeJson(data))
+
+
     _ <- ZIO.attempt {
-        sdk.transit(bag, data.getBytes())
+        sdk.transit(bag, requestData.imageB64.getBytes())
       }.catchAllCause(ZIO.logErrorCause(_))
       .forkDaemon
 
-    transitCount <- transitCounter.value
-    _ <- Console.printLine(s"Transit count : ${transitCount.count}")
+    _ <- Console.printLine(s"Transiting image ${requestData.id}, hops count : ${requestData.remainingHopCount}")
 
-    requestData <- ZIO.from(JsonDecoder[ImageRequest].decodeJson(data))
     _ <- ZIO.when(requestData.remainingHopCount > 0) {
       val newSeed = if probably(PKIDefectProbability) then "DEFECT SEED" else requestData.seed
 
       val requestDataNew = requestData.copy(remainingHopCount = requestData.remainingHopCount - 1, seed = newSeed)
       val json = JsonEncoder[ImageRequest].encodeJson(requestDataNew)
       val body = Body.fromCharSequence(json)
-      ZIO.scoped {
-        ZClient.request(Request(
-          method = Method.GET,
-          url = ComputeURL,
-          body = body
-        )).catchAllCause(ZIO.logErrorCause(_))
-      }
-    }.forkDaemon
+      val url = if requestDataNew.remainingHopCount == 0 then StorageURL else ComputeURL
+      for {
+        response <- ZIO.scoped {
+          ZClient.request(Request(
+            method = Method.GET,
+            url = url,
+            body = body
+          ))
+        }
+      } yield ()
+    }.catchAllCause(ZIO.logErrorCause(_)).forkDaemon
 
 
   } yield Response(
@@ -68,34 +73,32 @@ def computeImage(request: Request) = ZIO.logSpan("Request processing time") {
 object worker extends ZIOAppDefault {
   val app = Routes(
     Method.GET / "compute" -> handler(computeImage(_)),
-    //    Method.GET / "ping" -> handler(for {
-    //      _ <- Console.printLine("Pinged").orDie
-    //      chunk <- Random.nextBytes(2500)
-    //    } yield Response(
-    //      body = Body.fromChunk(chunk)
-    //    ))
   ).toHttpApp
 
+  java.lang.System.setProperty("java.net.preferIPv4Stack", "true")
+  
   def run = {
     val sdkLayer = ZLayer.succeed {
       val log = LogManager.getRootLogger
       val sdkInfo = config
 
       val annotators = sdkInfo.getAnnotators
-        .map(cfg => new EnvironmentCheckerEntry(cfg.getKind(), new AnnotatorFactory().getAnnotator(cfg, sdkInfo, log)))
+        .map(cfg => new EnvironmentCheckerEntry(cfg.getKind, new AnnotatorFactory().getAnnotator(cfg, sdkInfo, log)))
       new DefaultSdk(annotators, sdkInfo, log)
     }
 
     val sslServerSocket = getServerSocket
 
-    new Thread(() => while (true) {
-      val socket = sslServerSocket.accept()
-      socket.setKeepAlive(true)
-      socket.getOutputStream.write(Array(1.toByte))
-      socket.getOutputStream.flush()
-    }).start()
+    Thread.startVirtualThread { () =>
+      while (true) {
+        val socket = sslServerSocket.accept()
+        socket.setKeepAlive(true)
+        socket.getOutputStream.write(Array(1.toByte))
+        socket.getOutputStream.flush()
+      }
+    }
 
-    val sslSocket = getClientSocket(Address)
+    val sslSocket = getClientSocket(WorkersAddress)
     sslSocket.getInputStream.read()
 
     val bag = ZLayer.succeed(PBag(
@@ -126,12 +129,26 @@ object worker extends ZIOAppDefault {
         .provide(
           Server.default,
           Client.default,
-          sdkLayer,
           bag,
+          sdkLayer,
           ZLayer.succeed(sslSocket)
         )
     } yield ()
   }
 }
+
+def bag(imageId: String) = for {
+  sslSocket <- ZIO.service[SSLSocket]
+} yield PBag(
+  AnnotationType.SourceCode -> new SourceCodeAnnotatorProps(
+    "./config",
+    if probably(SourceCodeDefectProbability) then "res/config-dir-checksum-defect.txt" else "res/config-dir-checksum.txt"
+  ),
+  AnnotationType.CHECKSUM -> new ChecksumAnnotatorProps(
+    "./config/config.json",
+    if probably(ChecksumDefectProbability) then "res/config-file-checksum-defect.txt" else "res/config-file-checksum.txt"
+  ),
+  AnnotationType.TLS -> sslSocket
+)
 
 def probably(f: Float): Boolean = ThreadLocalRandom.current().nextFloat() <= f

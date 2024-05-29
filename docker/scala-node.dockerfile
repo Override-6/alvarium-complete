@@ -26,4 +26,4 @@ COPY --from=builder /alvarium/out/$name/assembly.dest/out.jar .
 COPY --from=builder /alvarium/config config
 COPY --from=builder /alvarium/res res
 #ENTRYPOINT java -agentpath:/jprofiler/bin/linux-x64/libjprofilerti.so=port=8849 -jar out.jar
-ENTRYPOINT java -jar out.jar
+ENTRYPOINT java -jar -XX:+UseZGC -XX:+ZGenerational -XX:ZUncommitDelay=5 -XX:SoftMaxHeapSize=1g out.jar

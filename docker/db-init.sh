@@ -7,20 +7,25 @@ set -xeu
 psql $DSN <<< "CREATE DATABASE database;" || true
 
 cat << EOF | psql $DSN/database
-CREATE TABLE IF NOT EXISTS alvarium_annotation(
-  action_type varchar,
+
+DROP TABLE IF EXISTS alvarium_annotation;
+DROP TABLE IF EXISTS data_info;
+
+CREATE TABLE alvarium_annotation(
   id varchar PRIMARY KEY,
-  key varchar,
-  hash varchar,
-  host varchar,
   tag varchar,
-  layer varchar,
-  kind varchar,
-  signature varchar,
+  type varchar,
   is_satisfied boolean,
+  image_hash varchar,
+  host varchar,
   timestamp timestamp
 );
 
-TRUNCATE TABLE alvarium_annotation
-EOF
 
+CREATE TABLE data_info(
+  image_hash varchar,
+  label varchar
+);
+
+
+EOF

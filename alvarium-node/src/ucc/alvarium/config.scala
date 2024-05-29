@@ -11,7 +11,6 @@ import com.alvarium.utils.ServiceInfo
 import java.util.UUID
 
 val AllSupportedAnnotations = Seq(
-  AnnotationType.PKI,
   AnnotationType.SourceCode,
   AnnotationType.CHECKSUM,
   AnnotationType.SOURCE,

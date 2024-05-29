@@ -24,7 +24,7 @@ metadata:
 
 
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       name: worker
@@ -80,7 +80,7 @@ metadata:
 
 
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       name: worker
@@ -159,7 +159,7 @@ spec:
         type: Directory
         path: "/config/"
 ---
-#
+
 #apiVersion: v1
 #kind: Pod
 #metadata:
@@ -245,16 +245,19 @@ spec:
         claimName: database-data-storage-claim
 
 ---
+
+
+
 apiVersion: v1
 kind: Pod
 metadata:
-  name: master
+  name: emitter-trusted
 
 spec:
   restartPolicy: Never
   containers:
-    - name: master
-      image: alvarium-master:latest
+    - name: emitter-trusted
+      image: alvarium-emitter:latest
       imagePullPolicy: IfNotPresent
       volumeMounts:
         - mountPath: "/alvarium/data"
@@ -273,11 +276,6 @@ spec:
 
       securityContext:
         privileged: true
-
-  initContainers:
-    - name: db-init
-      image: db-init:latest
-      imagePullPolicy: IfNotPresent
 
   volumes:
     - name: data
@@ -299,3 +297,117 @@ spec:
 #    - name: lib64-content
 #      hostPath:
 #        path: /lib/x86_64-linux-gnu/
+
+
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: emitter-untrusted
+
+spec:
+  restartPolicy: Never
+  containers:
+    - name: emitter-untrusted
+      image: alvarium-emitter:latest
+      command: ["java"]
+      args: ["-jar", "-XX:+UseZGC", "-XX:+ZGenerational", "-XX:ZUncommitDelay=5", "-XX:SoftMaxHeapSize=1g", "out.jar", "untrusted"]
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+        - mountPath: "/alvarium/data"
+          name: data
+        - mountPath: "/dev/tpm0"
+          name: tpm-device
+          readOnly: false
+        - mountPath: /jprofiler
+          name: profiler
+        - mountPath: /.jprofiler
+          name: profiler-config
+#        - mountPath: /lib64
+#          name: lib64
+#        - mountPath: /lib/x86_64-linux-gnu/
+#          name: lib64-content
+
+      securityContext:
+        privileged: true
+
+  volumes:
+    - name: data
+      hostPath:
+        type: Directory
+        path: "/ML-data"
+    - name: tpm-device
+      hostPath:
+        path: /dev/tpm0
+    - name: profiler
+      hostPath:
+        path: /jprofiler
+    - name: profiler-config
+      hostPath:
+        path: /.jprofiler
+#    - name: lib64
+#      hostPath:
+#        path: /lib64
+#    - name: lib64-content
+#      hostPath:
+#        path: /lib/x86_64-linux-gnu/
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alvarium-storage
+
+spec:
+  clusterIP: None
+  selector:
+    name: storage
+  ports:
+    - port: 8080
+
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: storage
+  labels:
+    name: storage
+
+spec:
+  restartPolicy: OnFailure
+  containers:
+    - name: storage
+      image: alvarium-storage:latest
+      imagePullPolicy: IfNotPresent
+
+      securityContext:
+        privileged: true
+
+  initContainers:
+    - name: db-init
+      image: db-init:latest
+      imagePullPolicy: IfNotPresent
+
+
+
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: attach
+  labels:
+    name: attach
+
+spec:
+  containers:
+    - name: attach
+      image: ubuntu:latest
+      command:
+        - "sleep"
+        - infinity
+
+

@@ -23,7 +23,14 @@ trait AlvariumModule extends ScalaModule {
   def otherDeps = Agg[Dep]()
 }
 
-object master extends AlvariumModule {
+object emitter extends AlvariumModule {
+  override def moduleDeps = `alvarium-node` :: Nil
+  override def otherDeps = Agg(
+    ivy"dev.zio::zio-http:3.0.0-RC6",
+    ivy"dev.zio::zio-json:0.6.2",
+  )
+}
+object storage extends AlvariumModule {
   override def moduleDeps = `alvarium-node` :: Nil
   override def otherDeps = Agg(
     ivy"dev.zio::zio-http:3.0.0-RC6",

@@ -102,7 +102,7 @@ def provideRequest(id: String, fileContent: Array[Byte], signer: PublicKeySign) 
   val seed = content.hashCode.toString
 
   val signature = signer.sign(seed.getBytes)
-  ImageRequest(seed, Encoder.bytesToHex(signature), 5, id, content)
+  ImageRequest(seed, Encoder.bytesToHex(signature), 5, id, "label", content)
 }
 
 
