@@ -18,7 +18,7 @@ CREATE TABLE alvarium_annotation(
   is_satisfied boolean,
   image_hash varchar,
   host varchar,
-  timestamp timestamp
+  timestamp varchar
 );
 
 

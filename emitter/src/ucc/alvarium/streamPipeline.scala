@@ -222,7 +222,8 @@ def streamPipeline(lines: Seq[String], untrusted: Boolean) = {
         bag <- ZIO.service[PropertyBag]
 
         fileContent = os.read.bytes(ImagesDir / s"${info.id}.jpg") //os.read.stream(ImagesDir / s"${info.id}.jpg").readBytesThrough(_.readNBytes(1000))
-        request = provideRequest(info.id, if (untrusted) classes(ThreadLocalRandom.current().nextInt(classes.length)) else info.articleType, fileContent, signer)
+        label = if (untrusted) classes(ThreadLocalRandom.current().nextInt(classes.length)) else info.articleType
+        request = provideRequest(info.id, label, fileContent, signer)
         json = JsonEncoder[ImageRequest].encodeJson(request)
         body = Body.fromCharSequence(json)
 

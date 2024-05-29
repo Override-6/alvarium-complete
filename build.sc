@@ -25,13 +25,16 @@ trait AlvariumModule extends ScalaModule {
 
 object emitter extends AlvariumModule {
   override def moduleDeps = `alvarium-node` :: Nil
+
   override def otherDeps = Agg(
     ivy"dev.zio::zio-http:3.0.0-RC6",
     ivy"dev.zio::zio-json:0.6.2",
   )
 }
+
 object storage extends AlvariumModule {
   override def moduleDeps = `alvarium-node` :: Nil
+
   override def otherDeps = Agg(
     ivy"dev.zio::zio-http:3.0.0-RC6",
     ivy"dev.zio::zio-json:0.6.2",
@@ -40,6 +43,14 @@ object storage extends AlvariumModule {
     ivy"org.postgresql:postgresql:42.3.1"
   )
 }
+
+object measurer extends AlvariumModule {
+  override def otherDeps = Agg(
+    ivy"io.getquill::quill-jdbc-zio:4.8.3",
+    ivy"org.postgresql:postgresql:42.3.1"
+  )
+}
+
 object worker extends AlvariumModule {
   override def moduleDeps = `alvarium-node` :: Nil
 
@@ -50,8 +61,10 @@ object worker extends AlvariumModule {
 }
 
 object `alvarium-node` extends AlvariumModule
+
 object `benchmark` extends ScalaModule {
   def scalaVersion = "3.4.0"
+
   override def moduleDeps = `alvarium-node` :: Nil
 }
 

@@ -66,7 +66,7 @@ def computeImage(request: Request) = ZIO.logSpan("Request processing time") {
     status = Status.Ok,
     body = request.body
   ))
-    .catchAllCause(e => ZIO.logErrorCause(e) &> ZIO.succeed(Response(Status.InternalServerError, body = Body.fromString("error!"))))
+    .catchAllCause(e => ZIO.logErrorCause(e) &> ZIO.succeed(Response(Status.InternalServerError, body = Body.fromString("error!"))) *> ZIO.succeed { sys.exit(1) })
 }
 
 
