@@ -1,17 +1,21 @@
 package ucc.alvarium
 
-import com.alvarium.DefaultSdk
-import com.alvarium.annotators.{EnvironmentCheckerFactory, EnvironmentCheckerEntry}
-//import com.alvarium.annotators.AnnotatorFactory
-import com.alvarium.contracts.AnnotationType
-import com.alvarium.utils.{Encoder, PropertyBag}
+import com.alvarium.engine.AlvariumActionKind.Publish
+import com.alvarium.checker.builtin.{BuiltinChecks, TestChecker}
+import com.alvarium.config.SerializerType.Jsoniter
+import com.alvarium.config.{Endpoint, SerializerType, SigningType, StreamType}
+import com.alvarium.engine.AlvariumEngineBuilder
+import com.alvarium.signing.SigningKey.FileKey
+import com.alvarium.utils.{bytesToHex, hexToBytes}
 import com.google.crypto.tink.PublicKeySign
 import com.google.crypto.tink.subtle.Ed25519Sign
-import org.apache.logging.log4j.LogManager
-import ucc.alvarium.PropertyBag as PBag
 import zio.json.JsonEncoder
 
+import java.nio.file.Path
 import java.time.{Duration, Instant}
+import java.util.UUID
+import java.util.concurrent.{Executor, Executors}
+import scala.concurrent.{Await, ExecutionContext, Future}
 
 
 val ImagesDir = os.pwd / "data" / "images"
@@ -23,34 +27,22 @@ val NumberPattern = "([0-9]+)".r
 @main def bench = {
   val privateKey = os.read(os.pwd / "res" / "private.key")
 
-  given PublicKeySign = new Ed25519Sign(Encoder.hexToBytes(privateKey).take(32))
+  given PublicKeySign = new Ed25519Sign(hexToBytes(privateKey).take(32))
 
-  given PropertyBag = PBag(
-//    AnnotationType.SourceCode -> new SourceCodeAnnotatorProps(
-//      "./config",
-//      "res/config-dir-checksum.txt"
-//    ),
-//    AnnotationType.CHECKSUM -> new ChecksumAnnotatorProps(
-//      "./config/config.json",
-//      "res/config-file-checksum.txt"
-//    ),
-//    AnnotationType.TLS -> sslSocket
-  )
-
-  runBench(5000, 20000)()
-  runBench(5000, 20000)(AnnotationType.SOURCE)
-  runBench(5000, 20000)((AnnotationType.SOURCE :: Nil) * 3*)
-  runBench(5000, 20000)((AnnotationType.SOURCE :: Nil) * 5*)
-  runBench(5000, 20000)((AnnotationType.SOURCE :: Nil) * 7*)
-  runBench(5000, 20000)((AnnotationType.SOURCE :: Nil) * 10*)
+  runBench(5000, 20000, 0)
+  runBench(5000, 20000, 1)
+  runBench(5000, 20000, 3)
+  runBench(5000, 20000, 5)
+  runBench(5000, 20000, 7)
+  runBench(5000, 20000, 10)
   println("---")
 
-  runBench(5000, 0)((AnnotationType.SOURCE :: Nil) * 5 *)
-  runBench(5000, 1000)((AnnotationType.SOURCE :: Nil) * 5 *)
-  runBench(5000, 5000)((AnnotationType.SOURCE :: Nil) * 5 *)
-  runBench(5000, 10000)((AnnotationType.SOURCE :: Nil) * 5 *)
-  runBench(5000, 20000)((AnnotationType.SOURCE :: Nil) * 5 *)
-  runBench(5000, 80000)((AnnotationType.SOURCE :: Nil) * 5 *)
+  runBench(5000, 0, 5)
+  runBench(5000, 1000, 5)
+  runBench(5000, 5000, 5)
+  runBench(5000, 10000, 5)
+  runBench(5000, 20000, 5)
+  runBench(5000, 80000, 5)
 
   println("END")
 }
@@ -58,27 +50,35 @@ val NumberPattern = "([0-9]+)".r
 extension [A](that: Seq[A])
   def *(n: Int): Seq[A] = (1 to n).flatMap(_ => that)
 
+val executor = Executors.newVirtualThreadPerTaskExecutor()
+given ec : ExecutionContext = ExecutionContext.fromExecutor(executor)
 
-def runBench(iterationCount: Int, dataSize: Int)(annotations: AnnotationType*)(using bag: PropertyBag, signer: PublicKeySign): Unit = {
+def getEngine(annotationCount: Int) = new AlvariumEngineBuilder {
+  override val signer: SigningType = SigningType.Ed25519(FileKey(Path.of("./res/private.key")), true)
+  override val stream: StreamType = StreamType.Mqtt(Endpoint("mosquitto-server", "tcp", 1883), UUID.randomUUID().toString, 0, false, None)("alvarium-topic")
+  override val executor: Executor = Executors.newVirtualThreadPerTaskExecutor()
+  override val serializer: SerializerType = Jsoniter()
+
+  for (i <- 0 to annotationCount) {
+    addCheck(BuiltinChecks.Test(), new TestChecker())
+  }
+}.build()
+
+def runBench(iterationCount: Int, dataSize: Int, annotationCount: Int)(using signer: PublicKeySign): Unit = {
   val request = provideRequest("0", new Array(dataSize), signer)
   val json = JsonEncoder[ImageRequest].encodeJson(request)
   val bytes = json.toString.getBytes()
 
-  val sdk = {
-    val log = LogManager.getRootLogger
-    val sdkInfo = config(annotations*)
-    val annotators = sdkInfo.getAnnotators
-      .map(cfg => new EnvironmentCheckerEntry(cfg.getKind(), EnvironmentCheckerFactory.getChecker(cfg, sdkInfo, log, null)))
-//    val annotators = sdkInfo.getAnnotators.map(new AnnotatorFactory().getAnnotator(_, sdkInfo, log))
-    new DefaultSdk(annotators, sdkInfo, log)
-  }
+  val engine = getEngine(annotationCount)
 
-  measure(s"iterations : $iterationCount, bytes: $dataSize, annotations count : ${annotations.length}", 10) {
-    for (i <- 0 to iterationCount) {
-//      if (i % 1000 == 0)
-//        println(i)
-      sdk.create(bag, bytes)
+  measure(s"iterations : $iterationCount, bytes: $dataSize, annotations count : $annotationCount", 10) {
+    val futures = for (i <- 0 to iterationCount) yield {
+      //      if (i % 1000 == 0)
+      //        println(i)
+      engine.annotate(Publish(), bytes)
+        .send()
     }
+    Await.result(Future.sequence(futures), scala.concurrent.duration.Duration.Inf)
   }
 }
 
@@ -98,11 +98,11 @@ def measure(label: String, count: Int)(f: => Unit): Unit = {
 }
 
 def provideRequest(id: String, fileContent: Array[Byte], signer: PublicKeySign) = {
-  val content = Encoder.bytesToHex(fileContent)
+  val content = bytesToHex(fileContent)
   val seed = content.hashCode.toString
 
   val signature = signer.sign(seed.getBytes)
-  ImageRequest(seed, Encoder.bytesToHex(signature), 5, id, "label", content)
+  ImageRequest(seed, bytesToHex(signature), 5, id, "label", content)
 }
 
 

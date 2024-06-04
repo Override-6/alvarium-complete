@@ -1,0 +1,14 @@
+master            | iterations : 5000, bytes: 20000, annotations count : 0 - min: PT0.082S avg: PT0.158S max: PT0.59S
+master            | iterations : 5000, bytes: 20000, annotations count : 1 - min: PT0.078S avg: PT0.115S max: PT0.277S
+master            | iterations : 5000, bytes: 20000, annotations count : 3 - min: PT0.089S avg: PT0.097S max: PT0.113S
+master            | iterations : 5000, bytes: 20000, annotations count : 5 - min: PT0.097S avg: PT0.104S max: PT0.13S
+master            | iterations : 5000, bytes: 20000, annotations count : 7 - min: PT0.096S avg: PT0.108S max: PT0.133S
+master            | iterations : 5000, bytes: 20000, annotations count : 10 - min: PT0.106S avg: PT0.112S max: PT0.132S
+master            | ---
+master            | iterations : 5000, bytes: 0, annotations count : 5 - min: PT0.085S avg: PT0.093S max: PT0.1S
+master            | iterations : 5000, bytes: 1000, annotations count : 5 - min: PT0.087S avg: PT0.097S max: PT0.122S
+master            | iterations : 5000, bytes: 5000, annotations count : 5 - min: PT0.084S avg: PT0.096S max: PT0.109S
+master            | iterations : 5000, bytes: 10000, annotations count : 5 - min: PT0.093S avg: PT0.101S max: PT0.123S
+master            | iterations : 5000, bytes: 20000, annotations count : 5 - min: PT0.091S avg: PT0.101S max: PT0.113S
+master            | iterations : 5000, bytes: 80000, annotations count : 5 - min: PT0.113S avg: PT0.125S max: PT0.161S
+master            | END
