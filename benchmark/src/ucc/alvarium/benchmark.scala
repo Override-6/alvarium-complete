@@ -1,7 +1,7 @@
 package ucc.alvarium
 
 import com.alvarium.DefaultSdk
-import com.alvarium.annotators.{AnnotatorFactory, EnvironmentCheckerEntry}
+import com.alvarium.annotators.{EnvironmentCheckerFactory, EnvironmentCheckerEntry}
 //import com.alvarium.annotators.AnnotatorFactory
 import com.alvarium.contracts.AnnotationType
 import com.alvarium.utils.{Encoder, PropertyBag}
@@ -68,7 +68,7 @@ def runBench(iterationCount: Int, dataSize: Int)(annotations: AnnotationType*)(u
     val log = LogManager.getRootLogger
     val sdkInfo = config(annotations*)
     val annotators = sdkInfo.getAnnotators
-      .map(cfg => new EnvironmentCheckerEntry(cfg.getKind(), new AnnotatorFactory().getAnnotator(cfg, sdkInfo, log)))
+      .map(cfg => new EnvironmentCheckerEntry(cfg.getKind(), EnvironmentCheckerFactory.getChecker(cfg, sdkInfo, log, null)))
 //    val annotators = sdkInfo.getAnnotators.map(new AnnotatorFactory().getAnnotator(_, sdkInfo, log))
     new DefaultSdk(annotators, sdkInfo, log)
   }

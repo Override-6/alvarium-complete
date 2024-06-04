@@ -29,17 +29,16 @@ services:
 #      - net
 
 
-  worker:
-    depends_on:
-      - mosquitto-server
-    image: alvarium-worker:latest
-    container_name: alvarium-workers
-    networks:
-      - net
+#  worker:
+#    depends_on:
+#      - mosquitto-server
+#    image: alvarium-worker:latest
+#    container_name: alvarium-workers
+#    networks:
+#      - net
 
-  master:
+  bench:
     depends_on:
-      - worker
       - mosquitto-server
     image: alvarium-benchmark:latest
     container_name: master
@@ -48,6 +47,6 @@ services:
     ports:
       - 8849:8849
     volumes:
-      - "/home/intern01/jprofiler14:/jprofiler/"
+      - "~/jprofiler14:/jprofiler/"
       - "../data:/alvarium/data/"
 
