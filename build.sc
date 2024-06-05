@@ -14,7 +14,7 @@ trait AlvariumModule extends ScalaModule {
     ivy"com.lihaoyi::os-lib:0.9.3",
     ivy"org.apache.logging.log4j:log4j-core:2.21.0",
     ivy"com.google.code.findbugs:jsr305:2.0.2",
-    ivy"dev.zio::zio:2.1-RC1",
+    ivy"dev.zio::zio:2.1.2",
     ivy"dev.zio::zio-json:0.6.2",
   ) ++ otherDeps
 

@@ -1,11 +1,11 @@
 package ucc.alvarium
 
-import com.alvarium.engine.AlvariumActionKind.Publish
 import com.alvarium.checker.builtin.{BuiltinChecks, TestChecker}
 import com.alvarium.config.SerializerType.Jsoniter
-import com.alvarium.config.{Endpoint, SerializerType, SigningType, StreamType}
+import com.alvarium.config.{SerializerType, SigningType}
+import com.alvarium.crypto.SigningKey.FileKey
+import com.alvarium.engine.AlvariumActionKind.Publish
 import com.alvarium.engine.AlvariumEngineBuilder
-import com.alvarium.signing.SigningKey.FileKey
 import com.alvarium.utils.{bytesToHex, hexToBytes}
 import com.google.crypto.tink.PublicKeySign
 import com.google.crypto.tink.subtle.Ed25519Sign
@@ -13,8 +13,7 @@ import zio.json.JsonEncoder
 
 import java.nio.file.Path
 import java.time.{Duration, Instant}
-import java.util.UUID
-import java.util.concurrent.{Executor, Executors}
+import java.util.concurrent.Executors
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 
@@ -50,13 +49,11 @@ val NumberPattern = "([0-9]+)".r
 extension [A](that: Seq[A])
   def *(n: Int): Seq[A] = (1 to n).flatMap(_ => that)
 
-val executor = Executors.newVirtualThreadPerTaskExecutor()
-given ec : ExecutionContext = ExecutionContext.fromExecutor(executor)
+given ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
 
 def getEngine(annotationCount: Int) = new AlvariumEngineBuilder {
   override val signer: SigningType = SigningType.Ed25519(FileKey(Path.of("./res/private.key")), true)
-  override val stream: StreamType = StreamType.Mqtt(Endpoint("mosquitto-server", "tcp", 1883), UUID.randomUUID().toString, 0, false, None)("alvarium-topic")
-  override val executor: Executor = Executors.newVirtualThreadPerTaskExecutor()
+  //  override val stream: StreamType = StreamType.Mqtt(Endpoint("mosquitto-server", "tcp", 1883), UUID.randomUUID().toString, 0, false, None)("alvarium-topic")
   override val serializer: SerializerType = Jsoniter()
 
   for (i <- 0 to annotationCount) {

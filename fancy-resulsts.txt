@@ -1,3 +1,4 @@
+scala POC (Futures)
 master            | iterations : 5000, bytes: 20000, annotations count : 0 - min: PT0.082S avg: PT0.158S max: PT0.59S
 master            | iterations : 5000, bytes: 20000, annotations count : 1 - min: PT0.078S avg: PT0.115S max: PT0.277S
 master            | iterations : 5000, bytes: 20000, annotations count : 3 - min: PT0.089S avg: PT0.097S max: PT0.113S
@@ -12,3 +13,69 @@ master            | iterations : 5000, bytes: 10000, annotations count : 5 - min
 master            | iterations : 5000, bytes: 20000, annotations count : 5 - min: PT0.091S avg: PT0.101S max: PT0.113S
 master            | iterations : 5000, bytes: 80000, annotations count : 5 - min: PT0.113S avg: PT0.125S max: PT0.161S
 master            | END
+
+scala POC (ZIO - platform threads)
+master            | iterations : 5000, bytes: 20000, annotations count : 0 - min: PT0.323S avg: PT0.545S max: PT1.19S
+master            | iterations : 5000, bytes: 20000, annotations count : 1 - min: PT0.242S avg: PT0.382S max: PT0.456S
+master            | iterations : 5000, bytes: 20000, annotations count : 3 - min: PT0.347S avg: PT0.367S max: PT0.398S
+master            | iterations : 5000, bytes: 20000, annotations count : 5 - min: PT0.287S avg: PT0.308S max: PT0.332S
+master            | iterations : 5000, bytes: 20000, annotations count : 7 - min: PT0.234S avg: PT0.262S max: PT0.291S
+master            | iterations : 5000, bytes: 20000, annotations count : 10 - min: PT0.193S avg: PT0.227S max: PT0.273S
+master            | ---
+master            | iterations : 5000, bytes: 0, annotations count : 5 - min: PT0.065S avg: PT0.086S max: PT0.188S
+master            | iterations : 5000, bytes: 1000, annotations count : 5 - min: PT0.061S avg: PT0.071S max: PT0.094S
+master            | iterations : 5000, bytes: 5000, annotations count : 5 - min: PT0.067S avg: PT0.078S max: PT0.089S
+master            | iterations : 5000, bytes: 10000, annotations count : 5 - min: PT0.102S avg: PT0.123S max: PT0.158S
+master            | iterations : 5000, bytes: 20000, annotations count : 5 - min: PT0.283S avg: PT0.3S max: PT0.324S
+master            | iterations : 5000, bytes: 80000, annotations count : 5 - min: PT0.744S avg: PT0.746S max: PT0.75S
+master            | END
+
+scala POC (ZIO - Loom threads + unified annotate/publish)
+master            | iterations : 5000, bytes: 20000, annotations count : 0 - min: PT0.07S avg: PT0.18S max: PT0.778S
+master            | iterations : 5000, bytes: 20000, annotations count : 1 - min: PT0.076S avg: PT0.103S max: PT0.267S
+master            | iterations : 5000, bytes: 20000, annotations count : 3 - min: PT0.079S avg: PT0.087S max: PT0.11S
+master            | iterations : 5000, bytes: 20000, annotations count : 5 - min: PT0.078S avg: PT0.085S max: PT0.103S
+master            | iterations : 5000, bytes: 20000, annotations count : 7 - min: PT0.082S avg: PT0.086S max: PT0.094S
+master            | iterations : 5000, bytes: 20000, annotations count : 10 - min: PT0.088S avg: PT0.093S max: PT0.098S
+master            | ---
+master            | iterations : 5000, bytes: 0, annotations count : 5 - min: PT0.076S avg: PT0.081S max: PT0.09S
+master            | iterations : 5000, bytes: 1000, annotations count : 5 - min: PT0.078S avg: PT0.082S max: PT0.088S
+master            | iterations : 5000, bytes: 5000, annotations count : 5 - min: PT0.077S avg: PT0.083S max: PT0.097S
+master            | iterations : 5000, bytes: 10000, annotations count : 5 - min: PT0.078S avg: PT0.084S max: PT0.095S
+master            | iterations : 5000, bytes: 20000, annotations count : 5 - min: PT0.083S avg: PT0.098S max: PT0.115S
+master            | iterations : 5000, bytes: 80000, annotations count : 5 - min: PT0.093S avg: PT0.1S max: PT0.108S
+master            | END
+
+scala POC (ZIO - Loom Threads / No root fibers)
+master            | iterations : 5000, bytes: 20000, annotations count : 0 - min: PT0.061S avg: PT0.146S max: PT0.641S
+master            | iterations : 5000, bytes: 20000, annotations count : 1 - min: PT0.066S avg: PT0.082S max: PT0.168S
+master            | iterations : 5000, bytes: 20000, annotations count : 3 - min: PT0.068S avg: PT0.079S max: PT0.147S
+master            | iterations : 5000, bytes: 20000, annotations count : 5 - min: PT0.07S avg: PT0.078S max: PT0.093S
+master            | iterations : 5000, bytes: 20000, annotations count : 7 - min: PT0.079S avg: PT0.082S max: PT0.09S
+master            | iterations : 5000, bytes: 20000, annotations count : 10 - min: PT0.079S avg: PT0.082S max: PT0.091S
+master            | ---
+master            | iterations : 5000, bytes: 0, annotations count : 5 - min: PT0.065S avg: PT0.071S max: PT0.08S
+master            | iterations : 5000, bytes: 1000, annotations count : 5 - min: PT0.062S avg: PT0.073S max: PT0.097S
+master            | iterations : 5000, bytes: 5000, annotations count : 5 - min: PT0.067S avg: PT0.073S max: PT0.082S
+master            | iterations : 5000, bytes: 10000, annotations count : 5 - min: PT0.069S avg: PT0.077S max: PT0.089S
+master            | iterations : 5000, bytes: 20000, annotations count : 5 - min: PT0.072S avg: PT0.076S max: PT0.089S
+master            | iterations : 5000, bytes: 80000, annotations count : 5 - min: PT0.086S avg: PT0.095S max: PT0.128S
+master            | END
+
+
+Java (all optimisations)
+master            | iterations : 5000, bytes: 20000, annotations count : 0 - min: PT0.498S avg: PT0.591S max: PT0.955S
+master            | iterations : 5000, bytes: 20000, annotations count : 1 - min: PT0.505S avg: PT0.535S max: PT0.579S
+master            | iterations : 5000, bytes: 20000, annotations count : 3 - min: PT0.545S avg: PT0.561S max: PT0.607S
+master            | iterations : 5000, bytes: 20000, annotations count : 5 - min: PT0.574S avg: PT0.585S max: PT0.616S
+master            | iterations : 5000, bytes: 20000, annotations count : 7 - min: PT0.626S avg: PT0.649S max: PT0.688S
+master            | iterations : 5000, bytes: 20000, annotations count : 10 - min: PT0.673S avg: PT0.7S max: PT0.759S
+master            | ---
+master            | iterations : 5000, bytes: 0, annotations count : 5 - min: PT0.463S avg: PT0.494S max: PT0.515S
+master            | iterations : 5000, bytes: 1000, annotations count : 5 - min: PT0.471S avg: PT0.503S max: PT0.549S
+master            | iterations : 5000, bytes: 5000, annotations count : 5 - min: PT0.496S avg: PT0.508S max: PT0.534S
+master            | iterations : 5000, bytes: 10000, annotations count : 5 - min: PT0.515S avg: PT0.548S max: PT0.613S
+master            | iterations : 5000, bytes: 20000, annotations count : 5 - min: PT0.59S avg: PT0.622S max: PT0.67S
+master            | iterations : 5000, bytes: 80000, annotations count : 5 - min: PT0.935S avg: PT0.967S max: PT1.047S
+master            | END
+
